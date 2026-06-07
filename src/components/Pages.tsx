@@ -393,7 +393,7 @@ export default function Pages({ currentTab, openInquiryForm }: PagesProps) {
                   </div>
                   <button
                     onClick={openInquiryForm}
-                    className="bg-emerald-900 text-white rounded-lg px-4 py-2 font-bold font-mono text-xs cursor-pointer shadow-sm hover:bg-emerald-950 transition-colors"
+                    className="bg-emerald-900 text-stone-950 rounded-lg px-4 py-2 font-bold font-mono text-xs cursor-pointer shadow-sm hover:bg-emerald-950 transition-colors"
                   >
                     RFQ Bulk Sourcing
                   </button>
@@ -599,7 +599,7 @@ export default function Pages({ currentTab, openInquiryForm }: PagesProps) {
             <div className="pt-6 flex justify-end">
               <button
                 onClick={openInquiryForm}
-                className="bg-emerald-900 hover:bg-emerald-950 text-white font-bold px-6 py-3.5 rounded-xl text-xs uppercase tracking-wider font-mono shadow-md cursor-pointer text-center w-full sm:w-auto"
+                className="bg-emerald-900 hover:bg-emerald-950 text-stone-950 font-bold px-6 py-3.5 rounded-xl text-xs uppercase tracking-wider font-mono shadow-md cursor-pointer text-center w-full sm:w-auto"
               >
                 Inquire and Request Pricing
               </button>

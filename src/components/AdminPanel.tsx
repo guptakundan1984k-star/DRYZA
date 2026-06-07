@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Inquiry, Product, ContestEntry, Customer, Banner, Coupon, WheelSettings } from '../types';
 import { CATEGORIES } from '../data';
-import {
-  TrendingUp, BarChart3, Database, ShieldAlert, CheckSquare, RefreshCw,
+import { TrendingUp, BarChart3, Database, ShieldAlert, CheckSquare, RefreshCw,
   Plus, Edit, Trash2, Mail, Phone, MapPin, Search, Calendar, ChevronRight, Calculator, Globe, X,
-  Trophy, Heart, Award, Sparkles, Undo, Image as ImageIcon, Settings, Percent, Gift
+  Trophy, Heart, Award, Sparkles, Undo, ImageIcon, Settings, Percent, Gift
 } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface AdminPanelProps {
@@ -27,6 +28,8 @@ interface AdminPanelProps {
   onUpdateLogo?: (url: string) => void;
   customers?: any[];
   onUpdateCustomers?: (updated: any[]) => void;
+  quizQuestions?: any[];
+  onUpdateQuizQuestions?: (updated: any[]) => void;
   contestEntries?: any[];
   onUpdateContestEntries?: (updated: any[]) => void;
   banners?: Banner[];
@@ -62,6 +65,8 @@ export default function AdminPanel({
   onUpdateLogo,
   customers = [],
   onUpdateCustomers,
+  quizQuestions = [],
+  onUpdateQuizQuestions,
   contestEntries = [],
   onUpdateContestEntries,
   banners = [],
@@ -201,7 +206,7 @@ export default function AdminPanel({
   // Derived dashboard analytics values
   const totalLeads = inquiries.length;
   const pendingLeads = inquiries.filter((i) => i.status === 'Ordered').length;
-  const underReviewLeads = inquiries.filter((i) => i.status === 'Packaging').length;
+  const underReviewLeads = inquiries.filter((i) => i.status === 'Processed').length;
   const quotedLeads = inquiries.filter((i) => i.status === 'Shipped').length;
   const totalVolumeRequestedKg = inquiries.reduce((sum, current) => sum + current.estimatedQuantityKg, 0);
   
@@ -429,64 +434,64 @@ export default function AdminPanel({
         <div className="flex flex-wrap gap-1.5 p-1 bg-stone-100 rounded-xl w-full max-w-2xl">
           <button
             onClick={() => setActiveAdminSubTab('leads')}
-            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer ${
-              activeAdminSubTab === 'leads' ? 'bg-amber-150 bg-amber-600 text-white' : 'text-stone-500 hover:text-stone-800'
+            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer transition-all ${
+              activeAdminSubTab === 'leads' ? 'bg-amber-600 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
             }`}
           >
             Orders Portal ({totalLeads})
           </button>
           <button
             onClick={() => setActiveAdminSubTab('inventory')}
-            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer ${
-              activeAdminSubTab === 'inventory' ? 'bg-amber-100 text-amber-800' : 'text-stone-500'
+            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer transition-all ${
+              activeAdminSubTab === 'inventory' ? 'bg-emerald-700 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
             }`}
           >
             Products ({products.length})
           </button>
           <button
             onClick={() => setActiveAdminSubTab('estimator')}
-            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer ${
-              activeAdminSubTab === 'estimator' ? 'bg-amber-100 text-amber-800' : 'text-stone-500'
+            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer transition-all ${
+              activeAdminSubTab === 'estimator' ? 'bg-indigo-600 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
             }`}
           >
             Freight CIF Estimator
           </button>
           <button
             onClick={() => setActiveAdminSubTab('clients')}
-            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer ${
-              activeAdminSubTab === 'clients' ? 'bg-amber-100 text-amber-800' : 'text-stone-500'
+            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer transition-all ${
+              activeAdminSubTab === 'clients' ? 'bg-purple-600 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
             }`}
           >
             Client Accounts Info ({customers?.length || 0})
           </button>
           <button
             onClick={() => setActiveAdminSubTab('engagement')}
-            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer ${
-              activeAdminSubTab === 'engagement' ? 'bg-amber-100 text-amber-800' : 'text-stone-500'
+            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer transition-all ${
+              activeAdminSubTab === 'engagement' ? 'bg-pink-600 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
             }`}
           >
             Engagement & Contests ({contestEntries?.length || 0})
           </button>
           <button
             onClick={() => setActiveAdminSubTab('banners')}
-            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer ${
-              activeAdminSubTab === 'banners' ? 'bg-amber-100 text-amber-800' : 'text-stone-500'
+            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer transition-all ${
+              activeAdminSubTab === 'banners' ? 'bg-rose-600 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
             }`}
           >
             Banners ({banners?.length || 0})
           </button>
           <button
             onClick={() => setActiveAdminSubTab('settings')}
-            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer ${
-              activeAdminSubTab === 'settings' ? 'bg-amber-100 text-amber-800 font-black' : 'text-stone-500'
+            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer transition-all ${
+              activeAdminSubTab === 'settings' ? 'bg-teal-600 text-white shadow font-black' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
             }`}
           >
             ⚙️ App Settings & Coupons
           </button>
           <button
             onClick={() => setActiveAdminSubTab('authentication')}
-            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer ${
-              activeAdminSubTab === 'authentication' ? 'bg-amber-100 text-amber-800' : 'text-stone-500'
+            className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg cursor-pointer transition-all ${
+              activeAdminSubTab === 'authentication' ? 'bg-stone-700 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/50'
             }`}
           >
             Passcode Options
@@ -684,7 +689,7 @@ export default function AdminPanel({
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono tracking-wide ${
                         inq.status === 'Ordered'
                           ? 'bg-amber-100 text-amber-900'
-                          : inq.status === 'Packaging'
+                          : inq.status === 'Processed'
                           ? 'bg-amber-200/60 text-amber-950 animate-pulse'
                           : inq.status === 'Shipped'
                           ? 'bg-cyan-100 text-cyan-950'
@@ -820,7 +825,7 @@ export default function AdminPanel({
                         Transition Pipeline Status
                       </span>
                       <div className="grid grid-cols-5 gap-1 font-mono text-[9px] font-extrabold text-center">
-                        {(['Ordered', 'Packaging', 'Shipped', 'Out for Delivery', 'Delivered'] as const).map((st) => (
+                        {(['Ordered', 'Processed', 'Shipped', 'Out for Delivery', 'Delivered'] as const).map((st) => (
                           <button
                             key={st}
                             type="button"
@@ -1114,7 +1119,7 @@ export default function AdminPanel({
               <button
                 type="button"
                 onClick={() => setShowAddProductForm(!showAddProductForm)}
-                className="bg-emerald-850 hover:bg-emerald-900 text-white px-3.5 py-2 rounded-xl text-xs font-semibold font-mono flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                className="bg-emerald-300 hover:bg-emerald-400 text-stone-900 px-3.5 py-2 rounded-xl text-xs font-semibold font-mono flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
                 id="add-new-product-subtab-btn"
               >
                 <Plus className="w-4 h-4" />
@@ -1182,10 +1187,10 @@ export default function AdminPanel({
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="block font-semibold text-stone-705">Silo Bulk Stock (MT)</label>
+                  <label className="block font-semibold text-stone-705">Initial Packs Count</label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="1"
                     placeholder="e.g. 15"
                     className="w-full p-2 bg-white border border-stone-250 rounded-lg font-mono"
                     value={newProdStock}
@@ -1194,10 +1199,10 @@ export default function AdminPanel({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-semibold text-stone-705">Price Per Kg B2B Range</label>
+                  <label className="block font-semibold text-stone-705">Price</label>
                   <input
                     type="text"
-                    placeholder="e.g. ₹4.20 - ₹5.10"
+                    placeholder="e.g. ₹4.20 - ₹5.10 or ₹350"
                     className="w-full p-2 bg-white border border-stone-250 rounded-lg font-mono"
                     value={newProdPriceRange}
                     onChange={(e) => setNewProdPriceRange(e.target.value)}
@@ -1384,7 +1389,7 @@ export default function AdminPanel({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-850 text-white hover:bg-emerald-900 rounded-lg font-mono font-bold shadow"
+                  className="px-4 py-2 bg-emerald-400 text-black hover:bg-emerald-500 rounded-lg font-mono font-bold shadow cursor-pointer"
                 >
                   Save Ingredient
                 </button>
@@ -1934,8 +1939,10 @@ export default function AdminPanel({
                             <div className="flex justify-end gap-1.5 items-center flex-wrap">
                               <button
                                 onClick={() => {
-                                  const updated = contestEntries.map(e => e.id === entry.id ? { ...e, status: 'approved' } : e);
+                                  const updatedEntry = { ...entry, status: 'approved' };
+                                  const updated = contestEntries.map(e => e.id === entry.id ? updatedEntry : e);
                                   onUpdateContestEntries?.(updated);
+                                  setDoc(doc(db, 'contestEntries', entry.id), updatedEntry);
                                 }}
                                 className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-mono text-[10px] rounded border cursor-pointer font-bold"
                               >
@@ -1943,8 +1950,10 @@ export default function AdminPanel({
                               </button>
                               <button
                                 onClick={() => {
-                                  const updated = contestEntries.map(e => e.id === entry.id ? { ...e, status: 'rejected' } : e);
+                                  const updatedEntry = { ...entry, status: 'rejected' };
+                                  const updated = contestEntries.map(e => e.id === entry.id ? updatedEntry : e);
                                   onUpdateContestEntries?.(updated);
+                                  setDoc(doc(db, 'contestEntries', entry.id), updatedEntry);
                                 }}
                                 className="px-2 py-1 bg-stone-50 hover:bg-stone-100 text-stone-700 font-mono text-[10px] rounded border cursor-pointer"
                               >
@@ -1957,14 +1966,25 @@ export default function AdminPanel({
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   if (!val) {
-                                    const updated = contestEntries.map(ent => ent.id === entry.id ? { ...ent, status: 'approved', weeklyWinnerRank: '' } : ent);
+                                    const updatedEntry = { ...entry, status: 'approved', weeklyWinnerRank: '' };
+                                    const updated = contestEntries.map(ent => ent.id === entry.id ? updatedEntry : ent);
                                     onUpdateContestEntries?.(updated);
+                                    setDoc(doc(db, 'contestEntries', entry.id), updatedEntry);
                                   } else {
-                                    const updated = contestEntries.map(ent => ent.id === entry.id ? { ...ent, status: 'winner', weeklyWinnerRank: val } : ent);
+                                    const updatedEntry = { ...entry, status: 'winner', weeklyWinnerRank: val, id: entry.id };
+                                    const updated = contestEntries.map(ent => ent.id === entry.id ? updatedEntry : ent);
                                     onUpdateContestEntries?.(updated);
+                                    setDoc(doc(db, 'contestEntries', entry.id), updatedEntry);
+                                    
                                     // Reward winner customer with massive 500 XP bonus instantly
-                                    const updatedCusts = customers.map(c => c.email === entry.customerEmail ? { ...c, points: (c.points || 0) + 500 } : c);
-                                    onUpdateCustomers?.(updatedCusts);
+                                    const targetCust = customers.find(c => c.email === entry.customerEmail);
+                                    if (targetCust) {
+                                      const updatedTargetCust = { ...targetCust, points: (targetCust.points || 0) + 500 };
+                                      const updatedCusts = customers.map(c => c.id === targetCust.id ? updatedTargetCust : c);
+                                      onUpdateCustomers?.(updatedCusts);
+                                      setDoc(doc(db, 'customers', targetCust.id), updatedTargetCust);
+                                    }
+                                    
                                     alert(`Assigned Winner status! Awarded +500 XP Bonus points to contestant.`);
                                   }
                                 }}
@@ -1979,7 +1999,10 @@ export default function AdminPanel({
                                 onClick={() => {
                                   if (confirm("Delete this contest entry permanently?")) {
                                     const updated = contestEntries.filter(e => e.id !== entry.id);
-                                    onUpdateContestEntries?.(updated);
+                                    if (onUpdateContestEntries) {
+                                      onUpdateContestEntries(updated);
+                                    }
+                                    deleteDoc(doc(db, 'contestEntries', entry.id));
                                   }
                                 }}
                                 className="p-1 text-red-650 hover:bg-red-50 rounded border shrink-0 cursor-pointer border-red-200"
@@ -2042,8 +2065,10 @@ export default function AdminPanel({
                               value={cust.loyaltyLevel || 'Bronze'}
                               onChange={(e) => {
                                 const level = e.target.value;
-                                const updated = customers.map(c => c.id === cust.id ? { ...c, loyaltyLevel: level } : c);
+                                const updatedCust = { ...cust, loyaltyLevel: level };
+                                const updated = customers.map(c => c.id === cust.id ? updatedCust : c);
                                 onUpdateCustomers?.(updated);
+                                setDoc(doc(db, 'customers', cust.id), updatedCust);
                                 alert(`Loyalty level updated for ${cust.companyName} to ${level}!`);
                               }}
                             >
@@ -2057,8 +2082,10 @@ export default function AdminPanel({
                             <div className="flex justify-end gap-1.5">
                               <button
                                 onClick={() => {
-                                  const updated = customers.map(c => c.id === cust.id ? { ...c, points: (c.points || 0) + 100 } : c);
+                                  const updatedCust = { ...cust, points: (cust.points || 0) + 100 };
+                                  const updated = customers.map(c => c.id === cust.id ? updatedCust : c);
                                   onUpdateCustomers?.(updated);
+                                  setDoc(doc(db, 'customers', cust.id), updatedCust);
                                 }}
                                 className="px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-mono rounded cursor-pointer font-bold text-[10.5px]"
                               >
@@ -2066,8 +2093,10 @@ export default function AdminPanel({
                               </button>
                               <button
                                 onClick={() => {
-                                  const updated = customers.map(c => c.id === cust.id ? { ...c, points: (c.points || 0) + 500 } : c);
+                                  const updatedCust = { ...cust, points: (cust.points || 0) + 500 };
+                                  const updated = customers.map(c => c.id === cust.id ? updatedCust : c);
                                   onUpdateCustomers?.(updated);
+                                  setDoc(doc(db, 'customers', cust.id), updatedCust);
                                 }}
                                 className="px-2 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-[#FCFCFA] font-mono rounded cursor-pointer font-black text-[10.5px]"
                               >
@@ -2075,8 +2104,10 @@ export default function AdminPanel({
                               </button>
                               <button
                                 onClick={() => {
-                                  const updated = customers.map(c => c.id === cust.id ? { ...c, points: 0, loyaltyLevel: 'Bronze' } : c);
+                                  const updatedCust = { ...cust, points: 0, loyaltyLevel: 'Bronze' };
+                                  const updated = customers.map(c => c.id === cust.id ? updatedCust : c);
                                   onUpdateCustomers?.(updated);
+                                  setDoc(doc(db, 'customers', cust.id), updatedCust);
                                 }}
                                 className="px-2 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 font-mono rounded cursor-pointer text-[10.5px] border border-red-200"
                               >
@@ -2095,6 +2126,98 @@ export default function AdminPanel({
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Section 2: Daily Quiz Manager */}
+          <div className="bg-stone-50 rounded-2xl border border-stone-200 p-5 sm:p-6 space-y-4">
+            <h3 className="text-base font-bold font-sans text-stone-900 flex items-center gap-1.5 uppercase tracking-wider">
+              <Brain className="w-5 h-5 text-emerald-850" /> Daily Quiz Questions
+            </h3>
+            <div className="space-y-4">
+              {quizQuestions?.map((q, idx) => (
+                <div key={q.id || idx} className="bg-white p-4 border border-stone-200 rounded-xl space-y-3">
+                  <div className="flex gap-2">
+                    <div className="w-6 h-6 shrink-0 bg-stone-100 rounded-lg flex items-center justify-center font-bold font-mono text-stone-900">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 space-y-2 text-xs font-mono">
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-stone-200 rounded-lg focus:border-amber-700 outline-none"
+                        value={q.question}
+                        onChange={(e) => {
+                          if (!onUpdateQuizQuestions) return;
+                          const copy = [...quizQuestions];
+                          copy[idx].question = e.target.value;
+                          onUpdateQuizQuestions(copy);
+                        }}
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                        {q.options.map((opt: string, oIdx: number) => (
+                          <div key={oIdx} className="flex gap-2 items-center">
+                            <input
+                              type="radio"
+                              name={`quiz-${q.id}-correct`}
+                              checked={q.correctAnswerIndex === oIdx}
+                              onChange={() => {
+                                if (!onUpdateQuizQuestions) return;
+                                const copy = [...quizQuestions];
+                                copy[idx].correctAnswerIndex = oIdx;
+                                onUpdateQuizQuestions(copy);
+                              }}
+                              className="cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              className="flex-1 p-1.5 border border-stone-200 rounded-lg outline-none focus:border-emerald-600 focus:bg-emerald-50 text-xs text-stone-800"
+                              value={opt}
+                              onChange={(e) => {
+                                if (!onUpdateQuizQuestions) return;
+                                const copy = [...quizQuestions];
+                                copy[idx].options[oIdx] = e.target.value;
+                                onUpdateQuizQuestions(copy);
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="pt-2 border-t mt-2">
+                        <label className="block text-[10px] text-stone-400 font-bold uppercase mb-1">Explanation</label>
+                        <textarea
+                          rows={2}
+                          className="w-full p-2 border border-stone-200 rounded-lg outline-none focus:border-amber-700 text-stone-800"
+                          value={q.explanation}
+                          onChange={(e) => {
+                            if (!onUpdateQuizQuestions) return;
+                            const copy = [...quizQuestions];
+                            copy[idx].explanation = e.target.value;
+                            onUpdateQuizQuestions(copy);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <button
+              onClick={() => {
+                if (!onUpdateQuizQuestions) return;
+                const newQ = {
+                  id: `quiz-${Date.now()}`,
+                  question: 'New Question...',
+                  options: ['Opt 1', 'Opt 2', 'Opt 3', 'Opt 4'],
+                  correctAnswerIndex: 0,
+                  explanation: 'Explanation',
+                  pointsReward: 50
+                };
+                onUpdateQuizQuestions([...(quizQuestions || []), newQ]);
+              }}
+              className="px-4 py-2 bg-emerald-400 hover:bg-emerald-500 text-black rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer"
+            >
+              <Plus className="inline w-3 h-3 mr-1"/> Add Question
+            </button>
           </div>
 
         </div>
@@ -2152,6 +2275,7 @@ export default function AdminPanel({
 
                   const updated = [...banners, newBanner];
                   onUpdateBanners?.(updated);
+                  setDoc(doc(db, 'banners', newBanner.id), newBanner);
                   form.reset();
                   alert('Banner uploaded successfully!');
                 }}
@@ -2262,7 +2386,10 @@ export default function AdminPanel({
                           onClick={() => {
                             if (confirm(`Are you sure you want to delete banner: "${banner.title}"?`)) {
                               const updated = banners.filter(b => b.id !== banner.id);
-                              onUpdateBanners?.(updated);
+                              if (onUpdateBanners) {
+                                onUpdateBanners(updated);
+                              }
+                              deleteDoc(doc(db, 'banners', banner.id));
                               alert('Banner deleted.');
                             }
                           }}
@@ -2291,13 +2418,24 @@ export default function AdminPanel({
             {/* Trusted Customers & FSSAI License */}
             <div className="bg-stone-50 rounded-2xl border border-stone-200 p-5 sm:p-6 space-y-4">
               <h3 className="text-base font-bold text-stone-900 flex items-center gap-1.5 uppercase tracking-wider font-sans">
-                <Settings className="w-5 h-5 text-amber-700" /> Trust Badge & Food Licensing
+                <Settings className="w-5 h-5 text-amber-700" /> Trust Badge & Branding
               </h3>
               <p className="text-xs text-stone-500">
-                Adjust corporate credential trademark metadata displayed. Trusted count rolls up from 0 to target on homepage refresh.
+                Adjust corporate credential trademark metadata, corporate logo URL, and trusted count.
               </p>
 
               <div className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-mono font-bold text-stone-600 uppercase">Brand Global Logo URL</label>
+                  <input
+                    type="text"
+                    placeholder="https://..."
+                    className="w-full text-xs p-2.5 bg-white border border-stone-200 rounded-xl focus:border-amber-700 outline-none font-mono"
+                    value={logoUrl}
+                    onChange={(e) => onUpdateLogo && onUpdateLogo(e.target.value)}
+                  />
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="block text-xs font-mono font-bold text-stone-600 uppercase">Trusted Clients Counter Target</label>
                   <div className="flex gap-2">
@@ -2362,6 +2500,7 @@ export default function AdminPanel({
                   };
 
                   onUpdateCoupons([newCoupon, ...coupons]);
+                  setDoc(doc(db, 'coupons', newCoupon.id), newCoupon);
                   setNewCouponCode('');
                   alert(`Coupon code "${codeUpper}" is now active!`);
                 }}
@@ -2420,7 +2559,7 @@ export default function AdminPanel({
 
                 <button
                   type="submit"
-                  className="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-mono text-[11px] py-2 font-bold rounded-lg uppercase transition-all shadow cursor-pointer"
+                  className="w-full bg-emerald-800 hover:bg-emerald-900 text-stone-950 font-mono text-[11px] py-2 font-bold rounded-lg uppercase transition-all shadow cursor-pointer"
                 >
                   Create & Activate Promo Code
                 </button>
@@ -2466,7 +2605,10 @@ export default function AdminPanel({
                             type="button"
                             onClick={() => {
                               if (confirm(`Are you sure you want to delete promo code: ${cop.code}?`)) {
-                                onUpdateCoupons(coupons.filter(c => c.id !== cop.id));
+                                if (onUpdateCoupons) {
+                                  onUpdateCoupons(coupons.filter(c => c.id !== cop.id));
+                                }
+                                deleteDoc(doc(db, 'coupons', cop.id));
                               }
                             }}
                             className="bg-red-50 hover:bg-red-100 text-red-750 hover:bg-red-100 text-red-700 px-3 py-1.5 border border-red-200 rounded-xl cursor-pointer text-xs font-semibold"

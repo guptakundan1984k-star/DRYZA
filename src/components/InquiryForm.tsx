@@ -95,11 +95,11 @@ export default function InquiryForm({
   const [customerType, setCustomerType] = useState<'restaurant' | 'manufacturer' | 'seasoning_brand' | 'hotel' | 'trader' | 'retail_buyer' | 'distributor'>('manufacturer');
   const [message, setMessage] = useState('');
 
-  // Reactively calculate total quantity: 1,000 Kilograms (1.0 MT) per selected item unit
+  // Reactively calculate total quantity logic
   const estimatedQuantityKg = useMemo(() => {
     return selectedProducts.reduce((sum, item) => {
       const qty = (cartQuantities && cartQuantities[item.id]) ?? 1;
-      return sum + (qty * 1000);
+      return sum + qty;
     }, 0);
   }, [selectedProducts, cartQuantities]);
 
@@ -178,6 +178,23 @@ export default function InquiryForm({
     }, 150);
   };
 
+  const computedBasePrice = useMemo(() => {
+    let pricePool = 0;
+    selectedProducts.forEach(prod => {
+      let prodPrice = 350; // fallback
+      const priceStr = loggedInCustomer?.role === 'cs' ? (prod.csPricePerKgRange || prod.pricePerKgRange) : prod.pricePerKgRange;
+      const matches = priceStr.match(/[\d.]+/g);
+      if (matches && matches.length >= 1) {
+        const parsed = matches.map(Number);
+        prodPrice = parsed.length === 2 ? (parsed[0] + parsed[1]) / 2 : parsed[0];
+      }
+      pricePool += prodPrice;
+    });
+    return pricePool > 0 ? (pricePool / selectedProducts.length) : 350; // Avg
+  }, [selectedProducts, loggedInCustomer]);
+
+  const computedSubtotal = useMemo(() => estimatedQuantityKg * computedBasePrice, [estimatedQuantityKg, computedBasePrice]);
+
   const executeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedProducts.length === 0) {
@@ -189,17 +206,15 @@ export default function InquiryForm({
       return;
     }
 
-    const basePrice = 350;
-    const subtotal = estimatedQuantityKg * basePrice;
     let computedDiscount = 0;
     if (appliedCoupon) {
       if (appliedCoupon.type === 'percent') {
-        computedDiscount = Math.round((subtotal * appliedCoupon.value) / 100);
+        computedDiscount = Math.round((computedSubtotal * appliedCoupon.value) / 100);
       } else {
         computedDiscount = appliedCoupon.value;
       }
     }
-    const finalCalculatedPrice = Math.max(0, subtotal - computedDiscount);
+    const finalCalculatedPrice = Math.max(0, computedSubtotal - computedDiscount);
 
     const savedInq = onSubmitInquiry({
       productIds: selectedProducts.map((p) => p.id),
@@ -242,7 +257,7 @@ export default function InquiryForm({
           {!isFullPage && (
             <button
               onClick={onClose}
-              className="p-2 text-emerald-250 hover:text-white hover:bg-emerald-800 rounded-full transition-colors cursor-pointer"
+              className="p-2 text-emerald-250 hover:text-stone-950 hover:bg-emerald-800 rounded-full transition-colors cursor-pointer"
               id="close-cart-box"
             >
               <X className="w-6 h-6" />
@@ -552,12 +567,12 @@ export default function InquiryForm({
               </div>
 
               {/* Toggle controls */}
-              <div className="grid grid-cols-2 bg-stone-100 p-1 rounded-xl border border-stone-200">
+              <div className="grid grid-cols-2 bg-stone-150 p-1 rounded-xl border border-stone-200">
                 <button
                   type="button"
                   onClick={() => { setAuthMode('login'); setAuthError(''); }}
-                  className={`py-1.5 text-xs font-bold font-mono rounded-lg transition-all ${
-                    authMode === 'login' ? 'bg-white text-emerald-950 shadow-sm' : 'text-stone-500'
+                  className={`py-1.5 text-xs font-bold font-mono rounded-lg transition-all cursor-pointer ${
+                    authMode === 'login' ? 'bg-emerald-800 text-white shadow-sm' : 'text-stone-500 hover:text-stone-700'
                   }`}
                 >
                   Client Sign In
@@ -565,8 +580,8 @@ export default function InquiryForm({
                 <button
                   type="button"
                   onClick={() => { setAuthMode('register'); setAuthError(''); }}
-                  className={`py-1.5 text-xs font-bold font-mono rounded-lg transition-all ${
-                    authMode === 'register' ? 'bg-white text-emerald-950 shadow-sm' : 'text-stone-500'
+                  className={`py-1.5 text-xs font-bold font-mono rounded-lg transition-all cursor-pointer ${
+                    authMode === 'register' ? 'bg-teal-700 text-white shadow-sm' : 'text-stone-500 hover:text-stone-700'
                   }`}
                 >
                   Create Partner ID
@@ -578,6 +593,51 @@ export default function InquiryForm({
                   ⚠️ {authError}
                 </div>
               )}
+
+              {/* Google Authentication */}
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const { auth, googleProvider, signInWithPopup } = await import('../lib/firebase');
+                      const result = await signInWithPopup(auth, googleProvider);
+                      const user = result.user;
+                      
+                      let matched = customers.find(c => c.email.toLowerCase() === user.email?.toLowerCase());
+                      if (!matched) {
+                        matched = {
+                          id: `cs-${user.uid}`,
+                          fullName: user.displayName || 'Google User',
+                          email: user.email || '',
+                          phone: user.phoneNumber || '',
+                          companyName: '',
+                          country: '',
+                          role: 'corporate'
+                        };
+                        onRegister(matched);
+                      }
+                      onLogin(matched);
+                    } catch (err: any) {
+                      setAuthError(err.message || 'Google Auth Failed');
+                    }
+                  }}
+                  className="w-full bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 py-2.5 rounded-xl font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 15.02 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  Sign in with Google
+                </button>
+              </div>
+
+              <div className="relative flex items-center justify-center my-4">
+                <div className="border-t border-stone-200 w-full" />
+                <span className="bg-[#FAF9F5] px-3 text-[9px] uppercase font-mono font-bold text-stone-400 absolute">Or Email</span>
+              </div>
             </div>
 
             <div className="max-w-sm mx-auto bg-white border border-stone-200 p-5 rounded-2xl shadow-inner">
@@ -629,7 +689,7 @@ export default function InquiryForm({
                   </div>
                   <button
                     type="submit"
-                    className="w-full bg-emerald-900 hover:bg-emerald-950 text-white font-mono py-3 font-bold rounded-xl text-xs uppercase cursor-pointer"
+                    className="w-full bg-emerald-900 hover:bg-emerald-950 text-stone-950 font-mono py-3 font-bold rounded-xl text-xs uppercase cursor-pointer"
                   >
                     Login & Verify Partner Profile
                   </button>
@@ -789,7 +849,7 @@ export default function InquiryForm({
                   </div>
                   <button
                     type="submit"
-                    className="w-full bg-amber-700 hover:bg-amber-800 text-white font-mono py-2.5 font-bold rounded-xl text-xs uppercase cursor-pointer"
+                    className="w-full bg-amber-700 hover:bg-amber-800 text-stone-950 font-mono py-2.5 font-bold rounded-xl text-xs uppercase cursor-pointer"
                   >
                     Register and Continue
                   </button>
@@ -980,16 +1040,38 @@ export default function InquiryForm({
                   />
                 </div>
 
-                {/* Country Destination (CIF/FOB estimations) */}
+                {/* Delivery Location / Destination */}
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-stone-755">Destination Port Country</label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-stone-755">Delivery Location / Address</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (navigator.geolocation) {
+                          navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                              setCountry(`Lat: ${position.coords.latitude.toFixed(6)}, Lng: ${position.coords.longitude.toFixed(6)}`);
+                            },
+                            (error) => {
+                              alert('Could not get live location. Please grant permission or enter manually.');
+                            }
+                          );
+                        } else {
+                          alert('Geolocation is not supported by this browser.');
+                        }
+                      }}
+                      className="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded font-mono font-bold cursor-pointer transition-colors"
+                    >
+                      Locate Live
+                    </button>
+                  </div>
                   <input
                     type="text"
                     required
-                    disabled
-                    placeholder="e.g. United States, Germany, Japan"
-                    className="w-full px-3 py-2.5 text-sm bg-stone-100 font-medium text-stone-700 border border-stone-200 rounded-xl cursor-not-allowed"
+                    placeholder="Enter manual address or use Locate Live"
+                    className="w-full px-3 py-2.5 text-sm bg-white font-medium text-stone-700 border border-stone-200 rounded-xl focus:border-emerald-700 focus:outline-none"
                     value={country}
+                    onChange={(e) => setCountry(e.target.value)}
                   />
                 </div>
 
@@ -1003,7 +1085,7 @@ export default function InquiryForm({
               </label>
 
               <div className="text-xs text-[#8C6D3E] font-medium leading-relaxed bg-amber-50 p-3 rounded-xl border border-amber-200/50">
-                ⚖️ <strong>Silo Allocation:</strong> Consignment weight is automatically synchronized at <strong>1,000 Kg (1.0 Metric Ton)</strong> per registered product unit.
+                ⚖️ <strong>Cart Units:</strong> Each unit represents 1 pack or the selected custom quantity.
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 
@@ -1092,16 +1174,16 @@ export default function InquiryForm({
                 {/* Computational Cost Breakdown */}
                 <div className="bg-white/95 p-4 rounded-xl border border-stone-200 font-mono text-xs text-stone-700 space-y-2">
                   <div className="flex justify-between">
-                    <span>Est. Base Rate per Kg:</span>
-                    <span className="font-bold">Rs. 350.00</span>
+                    <span>Avg. Base Rate per Unit:</span>
+                    <span className="font-bold">Rs. {computedBasePrice.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-b pb-2 border-stone-100">
                     <span>Est. Quantity:</span>
-                    <span className="font-bold">{estimatedQuantityKg.toLocaleString()} Kg</span>
+                    <span className="font-bold">{estimatedQuantityKg === 1 ? '1 Pack' : `${estimatedQuantityKg.toLocaleString()} Packs`}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
-                    <span className="font-semibold text-stone-900">Rs. {(estimatedQuantityKg * 350).toLocaleString()}</span>
+                    <span className="font-semibold text-stone-900">Rs. {computedSubtotal.toLocaleString()}</span>
                   </div>
 
                   {appliedCoupon && (
@@ -1110,9 +1192,8 @@ export default function InquiryForm({
                       <span>
                         -Rs. {
                           (() => {
-                            const subTotal = estimatedQuantityKg * 350;
                             if (appliedCoupon.type === 'percent') {
-                              return Math.round((subTotal * appliedCoupon.value) / 100).toLocaleString();
+                              return Math.round((computedSubtotal * appliedCoupon.value) / 100).toLocaleString();
                             } else {
                               return appliedCoupon.value.toLocaleString();
                             }
@@ -1127,16 +1208,15 @@ export default function InquiryForm({
                     <span>
                       Rs. {
                         (() => {
-                          const baseSubtotal = estimatedQuantityKg * 350;
                           let discount = 0;
                           if (appliedCoupon) {
                             if (appliedCoupon.type === 'percent') {
-                              discount = Math.round((baseSubtotal * appliedCoupon.value) / 100);
+                              discount = Math.round((computedSubtotal * appliedCoupon.value) / 100);
                             } else {
                               discount = appliedCoupon.value;
                             }
                           }
-                          return Math.max(0, baseSubtotal - discount).toLocaleString();
+                          return Math.max(0, computedSubtotal - discount).toLocaleString();
                         })()
                       }
                     </span>
@@ -1242,8 +1322,8 @@ export default function InquiryForm({
                 disabled={selectedProducts.length === 0}
                 className={`px-8 py-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider shadow-md transition-all cursor-pointer ${
                   selectedProducts.length === 0
-                    ? 'bg-stone-300 text-stone-500 cursor-not-allowed'
-                    : 'bg-emerald-900 text-stone-105 hover:bg-emerald-950 font-extrabold'
+                    ? 'bg-stone-300 text-stone-9500 cursor-not-allowed'
+                    : 'bg-emerald-900 text-stone-950 hover:bg-emerald-950 font-extrabold'
                 }`}
                 id="submit-order-button"
               >

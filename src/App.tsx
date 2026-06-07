@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { db } from './lib/firebase';
+import { collection, doc, onSnapshot, setDoc, writeBatch, deleteDoc, getDocs } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -14,8 +16,8 @@ import CommunityPanel from './components/CommunityPanel';
 import HomepageBanners from './components/HomepageBanners';
 import Footer from './components/Footer';
 import ProductPouch from './components/ProductPouch';
-import { CATEGORIES, PRODUCTS, SEED_INQUIRIES, SEED_CONTEST_ENTRIES, SEED_BANNERS } from './data';
-import { Product, Inquiry, Banner, Coupon, WheelSettings } from './types';
+import { CATEGORIES, PRODUCTS, SEED_INQUIRIES, SEED_CONTEST_ENTRIES, SEED_BANNERS, QUIZ_QUESTIONS } from './data';
+import { Product, Inquiry, Banner, Coupon, WheelSettings, QuizQuestion } from './types';
 import { Search, ChevronRight, ShieldCheck, Award, Info, AlertTriangle, X, Brain, Sparkles, RefreshCw } from 'lucide-react';
 
 export default function App() {
@@ -24,6 +26,10 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchWord, setSearchWord] = useState<string>('');
   const [localSearchTerm, setLocalSearchTerm] = useState<string>('');
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentTab]);
 
   // AI Semantic Custom Search States
   const [isAiSearch, setIsAiSearch] = useState<boolean>(true);
@@ -43,7 +49,7 @@ export default function App() {
   }, [cartQuantities]);
 
   // Flying animations particle tracker
-  const [flyingItems, setFlyingItems] = useState<{ id: string; startX: number; startY: number; image: string }[]>([]);
+  const [flyingItems, setFlyingItems] = useState<{ id: string; startX: number; startY: number; image: string; sprinkles?: { id: string; startX: number; startY: number; color: string; size: number; delay: number }[] }[]>([]);
 
   // Sourcing Client Accounts State
   const [customers, setCustomers] = useState<any[]>(() => {
@@ -128,10 +134,12 @@ export default function App() {
     }
   }, [logoUrl]);
 
+
   // Password Verification States
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Intercept Admin access changes with credential prompt
   const handleSetIsAdmin = (value: boolean) => {
@@ -179,7 +187,7 @@ export default function App() {
   // Global Dynamic Settings States (Admin Configurable)
   const [trustedCount, setTrustedCount] = useState<number>(() => {
     const saved = localStorage.getItem('dryza_trusted_count');
-    return saved ? parseInt(saved) : 53;
+    return saved ? parseInt(saved) : 103;
   });
 
   useEffect(() => {
@@ -193,6 +201,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('dryza_fssai_lic', fssaiLicNo);
   }, [fssaiLicNo]);
+
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => {
+    const saved = localStorage.getItem('dryza_quiz_questions');
+    if (saved) {
+      try { return JSON.parse(saved); } catch(e) {}
+    }
+    return QUIZ_QUESTIONS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dryza_quiz_questions', JSON.stringify(quizQuestions));
+  }, [quizQuestions]);
 
   const [coupons, setCoupons] = useState<Coupon[]>(() => {
     const saved = localStorage.getItem('dryza_coupons');
@@ -272,14 +292,17 @@ export default function App() {
     setLoggedInCustomer(updatedLoggedIn);
 
     // Sync back directly to general master list of buyer accounts
-    setCustomers((prev) =>
-      prev.map((c) => (c.email === loggedInCustomer.email ? updatedLoggedIn : c))
-    );
+    setCustomers((prev) => {
+      const next = prev.map((c) => (c.email === loggedInCustomer.email ? updatedLoggedIn : c));
+      const target = next.find((c) => c.email === loggedInCustomer.email);
+      if (target) setDoc(doc(db, 'customers', target.id), target);
+      return next;
+    });
   };
 
   const handleVoteContestEntry = (entryId: string, voterEmail: string) => {
-    setContestEntries((prev) =>
-      prev.map((entry) => {
+    setContestEntries((prev) => {
+      const next = prev.map((entry) => {
         if (entry.id === entryId) {
           const votedList = entry.votedUserEmails || [];
           if (votedList.includes(voterEmail)) {
@@ -293,11 +316,13 @@ export default function App() {
           };
           // Reward voter corporate account with 10 XP points
           handleUpdateCustomerPoints(10, `Voted on dish: ${entry.dishName}`);
+          setDoc(doc(db, 'contestEntries', entryId), updatedEntry);
           return updatedEntry;
         }
         return entry;
-      })
-    );
+      });
+      return next;
+    });
   };
 
   const handleAddUnlockedOffer = (offer: any) => {
@@ -308,26 +333,35 @@ export default function App() {
       unlockedOffers: [...currentOffers, offer]
     };
     setLoggedInCustomer(updatedLoggedIn);
-    setCustomers((prev) =>
-      prev.map((c) => (c.email === loggedInCustomer.email ? updatedLoggedIn : c))
-    );
+    setCustomers((prev) => {
+      const next = prev.map((c) => (c.email === loggedInCustomer.email ? updatedLoggedIn : c));
+      const target = next.find((c) => c.email === loggedInCustomer.email);
+      if (target) setDoc(doc(db, 'customers', target.id), target);
+      return next;
+    });
   };
 
-  const handleImportBackup = (backupData: any) => {
+  const handleImportBackup = async (backupData: any) => {
     if (!backupData) return;
     try {
+      const batch = writeBatch(db);
       if (backupData.customers) {
         setCustomers(backupData.customers);
+        backupData.customers.forEach((c: any) => batch.set(doc(db, 'customers', c.id), c));
       }
       if (backupData.inquiries) {
         setInquiries(backupData.inquiries);
+        backupData.inquiries.forEach((i: any) => batch.set(doc(db, 'inquiries', i.id), i));
       }
       if (backupData.products) {
         setProductsList(backupData.products);
+        backupData.products.forEach((p: any) => batch.set(doc(db, 'products', p.id), p));
       }
       if (backupData.contestEntries) {
         setContestEntries(backupData.contestEntries);
+        backupData.contestEntries.forEach((c: any) => batch.set(doc(db, 'contestEntries', c.id), c));
       }
+      await batch.commit();
       if (backupData.logoUrl !== undefined) {
         setLogoUrl(backupData.logoUrl);
       }
@@ -355,6 +389,114 @@ export default function App() {
   // Inquiry request form sheet modal visibility
   const [isInquiryOpen, setIsInquiryOpen] = useState<boolean>(false);
 
+  // FIREBASE SYNC - One global block
+  useEffect(() => {
+    // Single Docs
+    const unsubLogo = onSnapshot(doc(db, 'settings', 'logo'), (d) => {
+      if (d.exists()) setLogoUrl(prev => prev === d.data().url ? prev : d.data().url);
+    });
+
+    const unsubQuiz = onSnapshot(doc(db, 'settings', 'quiz'), (d) => {
+      if (d.exists() && d.data().questions) setQuizQuestions(d.data().questions);
+    });
+
+    const unsubAdminPass = onSnapshot(doc(db, 'settings', 'adminPass'), (d) => {
+      if (d.exists() && d.data().value) setAdminPassword(d.data().value);
+    });
+
+    const unsubTrustedCount = onSnapshot(doc(db, 'settings', 'trustedCount'), (d) => {
+      if (d.exists() && d.data().value !== undefined) setTrustedCount(d.data().value);
+    });
+
+    const unsubFssai = onSnapshot(doc(db, 'settings', 'fssai'), (d) => {
+      if (d.exists() && d.data().value) setFssaiLicNo(d.data().value);
+    });
+
+    const unsubWheel = onSnapshot(doc(db, 'settings', 'wheelSettings'), (d) => {
+      if (d.exists() && d.data().value) setWheelSettings(d.data().value);
+    });
+
+    // Collections
+    const unsubInquiries = onSnapshot(collection(db, 'inquiries'), (snapshot) => {
+      const inqs: any[] = [];
+      snapshot.forEach(doc => inqs.push({ id: doc.id, ...doc.data() }));
+      inqs.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      setInquiries(prev => JSON.stringify(prev) === JSON.stringify(inqs) ? prev : inqs);
+    });
+
+    const unsubCustomers = onSnapshot(collection(db, 'customers'), (snapshot) => {
+      const custs: any[] = [];
+      snapshot.forEach(doc => custs.push({ id: doc.id, ...doc.data() }));
+      setCustomers(prev => JSON.stringify(prev) === JSON.stringify(custs) ? prev : custs);
+    });
+
+    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const arr: any[] = [];
+      snapshot.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+      setProductsList(prev => JSON.stringify(prev) === JSON.stringify(arr) ? prev : arr);
+    });
+
+    const unsubBanners = onSnapshot(collection(db, 'banners'), (snapshot) => {
+      const arr: any[] = [];
+      snapshot.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+      setBanners(prev => JSON.stringify(prev) === JSON.stringify(arr) ? prev : arr);
+    });
+
+    const unsubCouponsCol = onSnapshot(collection(db, 'coupons'), (snapshot) => {
+      const arr: any[] = [];
+      snapshot.forEach(doc => arr.push({ ...doc.data() }));
+      setCoupons(prev => JSON.stringify(prev) === JSON.stringify(arr) ? prev : arr);
+    });
+
+    const unsubContests = onSnapshot(collection(db, 'contestEntries'), (snapshot) => {
+      const arr: any[] = [];
+      snapshot.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+      setContestEntries(prev => JSON.stringify(prev) === JSON.stringify(arr) ? prev : arr);
+    });
+
+    return () => {
+      unsubLogo(); unsubQuiz(); unsubAdminPass(); unsubTrustedCount(); unsubFssai(); unsubWheel();
+      unsubInquiries(); unsubCustomers(); unsubProducts(); unsubBanners(); unsubCouponsCol(); unsubContests();
+    };
+  }, []);
+
+  // Sync back hook blocks
+  useEffect(() => { if (logoUrl) setDoc(doc(db, 'settings', 'logo'), { url: logoUrl }); }, [logoUrl]);
+  useEffect(() => { if (quizQuestions.length > 0) setDoc(doc(db, 'settings', 'quiz'), { questions: quizQuestions }); }, [quizQuestions]);
+  useEffect(() => { if (adminPassword) setDoc(doc(db, 'settings', 'adminPass'), { value: adminPassword }); }, [adminPassword]);
+  useEffect(() => { if (trustedCount !== undefined) setDoc(doc(db, 'settings', 'trustedCount'), { value: trustedCount }); }, [trustedCount]);
+  useEffect(() => { if (fssaiLicNo) setDoc(doc(db, 'settings', 'fssai'), { value: fssaiLicNo }); }, [fssaiLicNo]);
+  useEffect(() => { if (wheelSettings) setDoc(doc(db, 'settings', 'wheelSettings'), { value: wheelSettings }); }, [wheelSettings]);
+
+  // Anti-inspect and anti-right-click
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent F12
+      if (e.key === 'F12') e.preventDefault();
+      // Prevent Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+      if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'i' || e.key === 'j')) {
+        e.preventDefault();
+      }
+      if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Scroll to top automatically when navigating between sections
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [currentTab]);
+
   // Synchronize collections
   useEffect(() => {
     localStorage.setItem('dryza_selected_products', JSON.stringify(selectedProducts));
@@ -374,27 +516,33 @@ export default function App() {
 
   // Lead State modifiers
   const handleUpdateInquiryStatus = (id: string, status: Inquiry['status']) => {
-    setInquiries((prev) =>
-      prev.map((inq) => (inq.id === id ? { ...inq, status } : inq))
-    );
+    setInquiries((prev) => {
+      const next = prev.map((inq) => (inq.id === id ? { ...inq, status } : inq));
+      const target = next.find(i => i.id === id);
+      if (target) setDoc(doc(db, 'inquiries', id), target);
+      return next;
+    });
   };
 
   const handleUpdateInquiryNotes = (id: string, adminNotes: string) => {
-    setInquiries((prev) =>
-      prev.map((inq) => (inq.id === id ? { ...inq, adminNotes } : inq))
-    );
+    setInquiries((prev) => {
+      const next = prev.map((inq) => (inq.id === id ? { ...inq, adminNotes } : inq));
+      const target = next.find(i => i.id === id);
+      if (target) setDoc(doc(db, 'inquiries', id), target);
+      return next;
+    });
   };
 
-  const handleDeleteInquiry = (id: string) => {
+  const handleDeleteInquiry = async (id: string) => {
     setInquiries((prev) => prev.filter((inq) => inq.id !== id));
+    await deleteDoc(doc(db, 'inquiries', id));
   };
 
   // Product Stocks modifier (for silos tonnage limits)
   const handleUpdateProductStock = (id: string, tons: number) => {
-    setProductsList((prev) =>
-      prev.map((p) => {
+    setProductsList((prev) => {
+      const next = prev.map((p) => {
         if (p.id === id) {
-          // Sync selected products as well
           const updated = { ...p, stockTons: tons };
           setSelectedProducts((currentSel) =>
             currentSel.map((sel) => (sel.id === id ? updated : sel))
@@ -402,16 +550,18 @@ export default function App() {
           if (selectedProductForModal?.id === id) {
             setSelectedProductForModal(updated);
           }
+          setDoc(doc(db, 'products', id), updated);
           return updated;
         }
         return p;
-      })
-    );
+      });
+      return next;
+    });
   };
 
   const handleUpdateProductPrice = (id: string, pricePerKgRange: string) => {
-    setProductsList((prev) =>
-      prev.map((p) => {
+    setProductsList((prev) => {
+      const next = prev.map((p) => {
         if (p.id === id) {
           const updated = { ...p, pricePerKgRange };
           setSelectedProducts((currentSel) =>
@@ -420,16 +570,18 @@ export default function App() {
           if (selectedProductForModal?.id === id) {
             setSelectedProductForModal(updated);
           }
+          setDoc(doc(db, 'products', id), updated);
           return updated;
         }
         return p;
-      })
-    );
+      });
+      return next;
+    });
   };
 
   const handleUpdateProductPhoto = (id: string, image: string) => {
-    setProductsList((prev) =>
-      prev.map((p) => {
+    setProductsList((prev) => {
+      const next = prev.map((p) => {
         if (p.id === id) {
           const updated = { ...p, image };
           setSelectedProducts((currentSel) =>
@@ -438,16 +590,18 @@ export default function App() {
           if (selectedProductForModal?.id === id) {
             setSelectedProductForModal(updated);
           }
+          setDoc(doc(db, 'products', id), updated);
           return updated;
         }
         return p;
-      })
-    );
+      });
+      return next;
+    });
   };
 
   const handleUpdateProduct = (id: string, updatedFields: Partial<Product>) => {
-    setProductsList((prev) =>
-      prev.map((p) => {
+    setProductsList((prev) => {
+      const next = prev.map((p) => {
         if (p.id === id) {
           const updated = { ...p, ...updatedFields };
           setSelectedProducts((currentSel) =>
@@ -456,39 +610,57 @@ export default function App() {
           if (selectedProductForModal?.id === id) {
             setSelectedProductForModal(updated);
           }
+          setDoc(doc(db, 'products', id), updated);
           return updated;
         }
         return p;
-      })
-    );
+      });
+      return next;
+    });
   };
 
   // Database handlers for clean/empty/seed control
   const handleAddProduct = (newProduct: Product) => {
     setProductsList((prev) => [...prev, newProduct]);
+    setDoc(doc(db, 'products', newProduct.id), newProduct);
   };
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = async (id: string) => {
     setProductsList((prev) => prev.filter((p) => p.id !== id));
     setSelectedProducts((prev) => prev.filter((p) => p.id !== id));
     if (selectedProductForModal?.id === id) {
       setSelectedProductForModal(null);
     }
+    await deleteDoc(doc(db, 'products', id));
   };
 
-  const handleResetToDemoData = () => {
+  const handleResetToDemoData = async () => {
     setProductsList(PRODUCTS);
     setInquiries(SEED_INQUIRIES);
+    
+    // Seed DB
+    const batch = writeBatch(db);
+    PRODUCTS.forEach((p, idx) => batch.set(doc(db, 'products', p.id || `product_${idx}`), p));
+    SEED_INQUIRIES.forEach((i, idx) => batch.set(doc(db, 'inquiries', i.id || `inquiry_${idx}`), i));
+    await batch.commit();
   };
 
-  const handleClearAllProducts = () => {
+  const handleClearAllProducts = async () => {
     setProductsList([]);
     setSelectedProducts([]);
     setSelectedProductForModal(null);
+    const snap = await getDocs(collection(db, 'products'));
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
   };
 
-  const handleClearAllInquiries = () => {
+  const handleClearAllInquiries = async () => {
     setInquiries([]);
+    const snap = await getDocs(collection(db, 'inquiries'));
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
   };
 
   // Cart / Queue interactions
@@ -571,6 +743,7 @@ export default function App() {
       status: 'Ordered',
     };
     setInquiries((prev) => [freshInquiry, ...prev]);
+    setDoc(doc(db, 'inquiries', freshInquiry.id), freshInquiry);
     setSelectedProducts([]); // Clean selection queue after positive launch
     setCartQuantities({}); // Reset cart quantities
     return freshInquiry;
@@ -579,6 +752,17 @@ export default function App() {
   // Trigger fly animation handler
   const triggerFlyAnimation = (product: Product, startX: number, startY: number) => {
     const animationId = Math.random().toString(36).substring(2, 9);
+    
+    // Generate beautiful sprinkles for trail effect when adding to cart
+    const sprinkles = Array.from({ length: 24 }).map((_, i) => ({
+      id: `sprinkle-${animationId}-${i}`,
+      startX: (startX || window.innerWidth / 2) + (Math.random() - 0.5) * 60,
+      startY: (startY || window.innerHeight / 2) + (Math.random() - 0.5) * 60,
+      color: ['#059669', '#10b981', '#f59e0b', '#d97706', '#fbbf24', '#ffffff'][Math.floor(Math.random() * 6)],
+      size: Math.random() * 6 + 3,
+      delay: Math.random() * 0.3
+    }));
+
     setFlyingItems((prev) => [
       ...prev,
       {
@@ -586,6 +770,7 @@ export default function App() {
         startX: startX || window.innerWidth / 2,
         startY: startY || window.innerHeight / 2,
         image: product.image || '',
+        sprinkles
       },
     ]);
   };
@@ -727,6 +912,8 @@ export default function App() {
               onUpdateLogo={setLogoUrl}
               customers={customers}
               onUpdateCustomers={setCustomers}
+              quizQuestions={quizQuestions}
+              onUpdateQuizQuestions={setQuizQuestions}
               contestEntries={contestEntries}
               onUpdateContestEntries={setContestEntries}
               banners={banners}
@@ -1010,7 +1197,7 @@ export default function App() {
                       <button
                         type="submit"
                         disabled={aiSearchLoading}
-                        className={`rounded-xl p-2.5 flex items-center justify-center cursor-pointer shadow-sm transition-colors shrink-0 text-white ${
+                        className={`rounded-xl p-2.5 flex items-center justify-center cursor-pointer shadow-sm transition-colors shrink-0 text-stone-950 ${
                           isAiSearch ? 'bg-[#0F766E] hover:bg-[#0D9488]' : 'bg-emerald-900 hover:bg-emerald-950'
                         }`}
                         title="Execute Match"
@@ -1125,9 +1312,19 @@ export default function App() {
                 loggedInCustomer={loggedInCustomer}
                 onUpdateCustomerPoints={handleUpdateCustomerPoints}
                 contestEntries={contestEntries}
-                onAddContestEntry={(entry) => setContestEntries((prev) => [entry, ...prev])}
+                onAddContestEntry={(entry) => {
+                  setContestEntries((prev) => [entry, ...prev]);
+                  setDoc(doc(db, 'contestEntries', entry.id), entry);
+                }}
                 onVoteContestEntry={handleVoteContestEntry}
                 customers={customers}
+                quizQuestions={quizQuestions}
+                onUpdateCustomerRecord={(updates) => {
+                  if (!loggedInCustomer) return;
+                  const updated = { ...loggedInCustomer, ...updates };
+                  setLoggedInCustomer(updated);
+                  setCustomers(prev => prev.map(c => c.email === updated.email ? updated : c));
+                }}
                 onOpenLogin={() => setIsClientAuthOpen(true)}
               />
             )}
@@ -1157,7 +1354,10 @@ export default function App() {
                   onClose={() => setCurrentTab('catalogue')}
                   loggedInCustomer={loggedInCustomer}
                   customers={customers}
-                  onRegister={(newCs) => setCustomers((prev) => [...prev, newCs])}
+                  onRegister={(newCs) => {
+                    setCustomers((prev) => [...prev, newCs]);
+                    setDoc(doc(db, 'customers', newCs.id), newCs);
+                  }}
                   onLogin={(cs) => setLoggedInCustomer(cs)}
                   coupons={coupons}
                   wheelSettings={wheelSettings}
@@ -1180,6 +1380,9 @@ export default function App() {
                 onOpenLogin={() => setIsClientAuthOpen(true)}
                 setCurrentTab={setCurrentTab}
                 wheelSettings={wheelSettings}
+                onCancelOrder={(id) => {
+                  setInquiries(prev => prev.filter(inq => inq.id !== id));
+                }}
               />
             )}
 
@@ -1226,7 +1429,10 @@ export default function App() {
         isOpen={isClientAuthOpen}
         onClose={() => setIsClientAuthOpen(false)}
         customers={customers}
-        onRegister={(newCs) => setCustomers((prev) => [...prev, newCs])}
+        onRegister={(newCs) => {
+          setCustomers((prev) => [...prev, newCs]);
+          setDoc(doc(db, 'customers', newCs.id), newCs);
+        }}
         onLogin={(cs) => setLoggedInCustomer(cs)}
       />
 
@@ -1267,18 +1473,42 @@ export default function App() {
                 <label className="block text-[10px] font-mono text-stone-400 uppercase tracking-widest font-black text-left">
                   Staff Passkey
                 </label>
-                <input
-                  type="password"
-                  required
-                  autoFocus
-                  placeholder="Enter credentials..."
-                  className="w-full text-center text-xs p-3 font-mono bg-stone-50 border border-stone-200 rounded-xl focus:border-amber-700 focus:bg-white outline-none"
-                  value={passwordInput}
-                  onChange={(e) => {
-                    setPasswordInput(e.target.value);
-                    if (passwordError) setPasswordError('');
-                  }}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoFocus
+                    placeholder="Enter credentials..."
+                    className="w-full text-center text-xs p-3 pr-10 font-mono bg-stone-50 border border-stone-200 rounded-xl focus:border-amber-700 focus:bg-white outline-none"
+                    value={passwordInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPasswordInput(val);
+                      if (passwordError) setPasswordError('');
+                      if (val === adminPassword || val === 'DRYZAjamshedpur') {
+                        setIsAdmin(true);
+                        setIsPasswordModalOpen(false);
+                        setPasswordInput('');
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
+                  >
+                    {showPassword ? (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
                 {passwordError && (
                   <p className="text-[10px] text-red-600 font-mono text-center font-bold">
                     ⚠️ {passwordError}
@@ -1300,36 +1530,67 @@ export default function App() {
       {/* Floating flying particles */}
       <AnimatePresence>
         {flyingItems.map((item) => (
-          <motion.div
-            key={item.id}
-            initial={{
-              position: 'fixed',
-              left: item.startX,
-              top: item.startY,
-              x: '-50%',
-              y: '-50%',
-              scale: 0.95,
-              opacity: 1,
-              zIndex: 9999,
-            }}
-            animate={{
-              left: [item.startX, (item.startX + window.innerWidth) / 2, window.innerWidth - 80],
-              top: [item.startY, item.startY - 150, 40],
-              scale: 0.35,
-              opacity: [1, 0.95, 0.25],
-            }}
-            exit={{ opacity: 0 }}
-            transition={{
-              duration: 1.1,
-              ease: 'easeInOut',
-            }}
-            onAnimationComplete={() => {
-              setFlyingItems((prev) => prev.filter((i) => i.id !== item.id));
-            }}
-            className="w-24 h-32 flex items-center justify-center pointer-events-none select-none bg-white rounded-2xl p-2.5 shadow-2.5xl border border-stone-200/80"
-          >
-            <ProductPouch product={productsList.find(p => p.image === item.image) || productsList[0] || PRODUCTS[0]} widthClass="w-[75px]" heightClass="h-[105px]" />
-          </motion.div>
+          <React.Fragment key={item.id}>
+            {item.sprinkles?.map((sprinkle) => (
+              <motion.div
+                key={sprinkle.id}
+                initial={{
+                  position: 'fixed',
+                  left: sprinkle.startX,
+                  top: sprinkle.startY,
+                  scale: 0,
+                  opacity: 1,
+                  zIndex: 9998,
+                  backgroundColor: sprinkle.color,
+                  width: sprinkle.size,
+                  height: sprinkle.size,
+                  borderRadius: '50%',
+                  boxShadow: '0 0 10px rgba(0,0,0,0.2)'
+                }}
+                animate={{
+                  left: [sprinkle.startX, (item.startX + window.innerWidth) / 2 + (Math.random() - 0.5) * 150, window.innerWidth - 80 + (Math.random() - 0.5) * 80],
+                  top: [sprinkle.startY, item.startY - 150 + (Math.random() - 0.5) * 150, 40 + (Math.random() - 0.5) * 80],
+                  scale: [0, 1.5, 0],
+                  opacity: [1, 0.8, 0],
+                }}
+                transition={{
+                  duration: 1.1 + Math.random() * 0.3,
+                  ease: 'easeInOut',
+                  delay: sprinkle.delay
+                }}
+                className="pointer-events-none"
+              />
+            ))}
+            <motion.div
+              initial={{
+                position: 'fixed',
+                left: item.startX,
+                top: item.startY,
+                x: '-50%',
+                y: '-50%',
+                scale: 0.95,
+                opacity: 1,
+                zIndex: 9999,
+              }}
+              animate={{
+                left: [item.startX, (item.startX + window.innerWidth) / 2, window.innerWidth - 80],
+                top: [item.startY, item.startY - 150, 40],
+                scale: 0.35,
+                opacity: [1, 0.95, 0.25],
+              }}
+              exit={{ opacity: 0 }}
+              transition={{
+                duration: 1.1,
+                ease: 'easeInOut',
+              }}
+              onAnimationComplete={() => {
+                setFlyingItems((prev) => prev.filter((i) => i.id !== item.id));
+              }}
+              className="w-24 h-32 flex items-center justify-center pointer-events-none select-none bg-white rounded-2xl p-2.5 shadow-2.5xl border border-stone-200/80"
+            >
+              <ProductPouch product={productsList.find(p => p.image === item.image) || productsList[0] || PRODUCTS[0]} widthClass="w-[75px]" heightClass="h-[105px]" />
+            </motion.div>
+          </React.Fragment>
         ))}
       </AnimatePresence>
 

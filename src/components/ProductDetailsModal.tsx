@@ -99,7 +99,7 @@ Generated via Dryza Client Portal on June 2026.
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-emerald-250 hover:text-white hover:bg-emerald-800 rounded-full cursor-pointer transition-colors"
+            className="p-2 text-emerald-250 hover:text-stone-950 hover:bg-emerald-800 rounded-full cursor-pointer transition-colors"
             id="close-modal-btn"
           >
             <X className="w-6 h-6" />
@@ -210,8 +210,8 @@ Generated via Dryza Client Portal on June 2026.
               onClick={handleDownloadSheet}
               className={`w-full sm:w-auto px-5 py-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 downloadSuccess
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-stone-900 text-stone-100 hover:bg-black'
+                  ? 'bg-amber-600 text-stone-950'
+                  : 'bg-stone-900 text-stone-950 hover:bg-black'
               }`}
             >
               {downloadSuccess ? (
@@ -229,13 +229,26 @@ Generated via Dryza Client Portal on June 2026.
 
             <div className="flex gap-3 w-full sm:w-auto">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  const rect = (e.target as HTMLElement).getBoundingClientRect();
+                  import('canvas-confetti').then((module) => {
+                    const confetti = module.default;
+                    confetti({
+                      particleCount: 80,
+                      spread: 60,
+                      origin: { 
+                        x: (rect.left + rect.width / 2) / window.innerWidth,
+                        y: (rect.top + rect.height / 2) / window.innerHeight
+                      },
+                      colors: ['#059669', '#34d399', '#fcd34d']
+                    });
+                  });
                   onAddToInquiry(product);
                 }}
                 className={`flex-1 sm:flex-none px-6 py-3 rounded-xl text-xs font-bold font-sans flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   isInInquiry
                     ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                    : 'bg-emerald-900 text-stone-100 hover:bg-emerald-950 font-semibold'
+                    : 'bg-emerald-400 text-stone-950 hover:bg-emerald-500 font-semibold border border-emerald-500'
                 }`}
               >
                 <span>{isInInquiry ? 'In Cart' : 'Add to Cart'}</span>

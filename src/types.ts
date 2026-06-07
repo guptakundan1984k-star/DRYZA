@@ -36,7 +36,7 @@ export interface Inquiry {
   estimatedQuantityKg: number;
   message: string;
   attachmentName?: string;
-  status: 'Ordered' | 'Packaging' | 'Shipped' | 'Out for Delivery' | 'Delivered';
+  status: 'Ordered' | 'Processed' | 'Shipped' | 'Out for Delivery' | 'Delivered';
   submittedAt: string;
   adminNotes?: string;
   couponCode?: string;

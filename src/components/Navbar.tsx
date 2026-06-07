@@ -153,7 +153,7 @@ export default function Navbar({
             {/* CTA Button */}
             <button
               onClick={openInquiryForm}
-              className="bg-emerald-850 hover:bg-emerald-900 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer border border-emerald-950/20"
+              className="bg-emerald-850 hover:bg-emerald-900 text-stone-950 px-5 py-2.5 rounded-lg text-sm font-medium shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer border border-emerald-950/20"
               id="nav-cta-quote"
             >
               My Cart

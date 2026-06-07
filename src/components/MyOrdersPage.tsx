@@ -26,6 +26,7 @@ interface MyOrdersPageProps {
   onOpenLogin: () => void;
   setCurrentTab: (tab: string) => void;
   wheelSettings?: any;
+  onCancelOrder?: (orderId: string) => void;
 }
 
 export default function MyOrdersPage({
@@ -34,7 +35,8 @@ export default function MyOrdersPage({
   loggedInCustomer,
   onOpenLogin,
   setCurrentTab,
-  wheelSettings
+  wheelSettings,
+  onCancelOrder
 }: MyOrdersPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export default function MyOrdersPage({
         <div>
           <button
             onClick={onOpenLogin}
-            className="px-6 py-3 bg-emerald-900 border border-emerald-950/20 hover:bg-emerald-950 text-white font-mono text-xs font-bold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer"
+            className="px-6 py-3 bg-emerald-900 border border-emerald-950/20 hover:bg-emerald-950 text-stone-950 font-mono text-xs font-bold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer"
             id="orders-authenticate-btn"
           >
             Authenticate Enterprise Session
@@ -166,7 +168,7 @@ export default function MyOrdersPage({
                 statusText = 'Received & Queued';
                 progressStep = 1;
                 break;
-              case 'Packaging':
+              case 'Processed':
                 statusBadge = 'bg-blue-50 text-blue-800 border-blue-200';
                 statusText = 'Lab QA & Sealed Packaging';
                 progressStep = 2;
@@ -243,44 +245,45 @@ export default function MyOrdersPage({
                 {isExpanded && (
                   <div className="p-5 sm:p-6 bg-stone-50/30 border-t border-stone-200 space-y-6 animate-fade-in text-xs">
                     
-                    {/* Visual Milestones Row */}
-                    <div className="grid grid-cols-5 gap-1.5 text-center bg-white border border-stone-150 p-4.5 rounded-2xl relative shadow-inner-sm overflow-hidden">
-                      
-                      <div className="space-y-2 relative z-10">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto text-[11px] font-bold ${progressStep >= 1 ? 'bg-emerald-900 text-white' : 'bg-stone-100 text-stone-400'}`}>
-                          {progressStep >= 1 ? <CheckCircle2 className="w-4 h-4 text-emerald-350" /> : '1'}
-                        </div>
-                        <span className="block text-[9.5px] font-bold text-stone-850 font-display">RFQ Registered</span>
-                      </div>
+                    {/* Vertical Timeline Order Tracking */}
+                    <div className="bg-white border border-stone-150 p-6 rounded-2xl relative shadow-inner-sm overflow-hidden text-sm">
+                      <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-stone-300 before:to-transparent">
+                        {[
+                          { key: 'Ordered', title: 'Order Confirmed', description: 'Your order has been placed.', icon: <ShoppingBag className="w-5 h-5 text-[#5D3D2E]" /> },
+                          { key: 'Processed', title: 'Seller Processed', description: 'Seller has processed your order.', icon: <Package className="w-5 h-5 text-[#5D3D2E]" /> },
+                          { key: 'Shipped', title: 'Shipped', description: 'Your item has been shipped.', icon: <Truck className="w-5 h-5 text-[#5D3D2E]" /> },
+                          { key: 'Out for Delivery', title: 'Out For Delivery', description: 'Your item is out for delivery', icon: <MapPin className="w-5 h-5 text-[#5D3D2E]" /> },
+                          { key: 'Delivered', title: 'Delivered', description: 'Your item has been delivered', icon: <CheckCircle className="w-5 h-5 text-[#5D3D2E]" /> }
+                        ].map((step, idx) => {
+                          const isCompleted = progressStep > idx;
+                          const isCurrent = progressStep - 1 === idx;
+                          
+                          // Simplified simulated dates logic based on submission time + days
+                          const simulatedDate = new Date(inq.submittedAt);
+                          simulatedDate.setDate(simulatedDate.getDate() + idx);
+                          
+                          const dateString = simulatedDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' }).replace(',', '');
+                          const timeString = simulatedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
 
-                      <div className="space-y-2 relative z-10">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto text-[11px] font-bold ${progressStep >= 2 ? 'bg-emerald-950 text-white' : 'bg-stone-100 text-stone-400'}`}>
-                          {progressStep >= 2 ? <CheckCircle2 className="w-4 h-4 text-emerald-350" /> : '2'}
-                        </div>
-                        <span className="block text-[9.5px] font-bold text-stone-850 font-display">QA Clearance</span>
-                      </div>
+                          if (!isCompleted && !isCurrent) return null; // Only show up to current status as per generic designs
 
-                      <div className="space-y-2 relative z-10">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto text-[11px] font-bold ${progressStep >= 3 ? 'bg-emerald-900 text-white' : 'bg-stone-100 text-stone-400'}`}>
-                          {progressStep >= 3 ? <Truck className="w-4 h-4 text-emerald-350" /> : '3'}
-                        </div>
-                        <span className="block text-[9.5px] font-bold text-stone-850 font-display">Sealed Dispatch</span>
+                          return (
+                            <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                              <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-[#5D3D2E]/20 bg-[#FAF7F2] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm relative z-10 flex-col mx-0 md:mx-auto absolute left-0 md:static transform -translate-x-[50%] md:translate-x-0">
+                                {step.icon}
+                              </div>
+                              <div className="w-[calc(100%-3rem)] md:w-[calc(50%-2.5rem)] ml-14 md:ml-0 md:px-5">
+                                <div className="flex items-baseline gap-2 mb-1">
+                                  <h4 className="text-[15px] font-bold text-[#5D3D2E]">{step.title}</h4>
+                                  <span className="text-[11px] text-[#A3998D]">{dateString}</span>
+                                </div>
+                                <p className="text-[12.5px] text-[#292524]">{step.description}</p>
+                                <p className="text-[11px] text-[#A3998D] mt-1.5">{dateString} - {timeString}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-
-                      <div className="space-y-2 relative z-10">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto text-[11px] font-bold ${progressStep >= 4 ? 'bg-emerald-800 text-white' : 'bg-stone-100 text-stone-400'}`}>
-                          {progressStep >= 4 ? <CheckCircle2 className="w-4 h-4 text-white" /> : '4'}
-                        </div>
-                        <span className="block text-[9.5px] font-bold text-stone-850 font-display">Transit Approaching</span>
-                      </div>
-
-                      <div className="space-y-2 relative z-10">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto text-[11px] font-bold ${progressStep >= 5 ? 'bg-emerald-700 text-white animate-pulse' : 'bg-stone-100 text-stone-400'}`}>
-                          {progressStep >= 5 ? <CheckCircle2 className="w-4 h-4 text-white" /> : '5'}
-                        </div>
-                        <span className="block text-[9.5px] font-bold text-stone-850 font-display font-display">Arrived & Verified</span>
-                      </div>
-
                     </div>
 
                     {/* Breakdown & details Grid */}
@@ -336,6 +339,22 @@ export default function MyOrdersPage({
                           {inq.couponCode && (
                             <div className="text-[10px] text-amber-900 font-mono font-bold bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block">
                               🏷️ Applied Code: {inq.couponCode}
+                            </div>
+                          )}
+
+                          {inq.status === 'Ordered' && onCancelOrder && (
+                            <div className="mt-4 border-t pt-4">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if(confirm('Are you sure you want to cancel this order?')) {
+                                    onCancelOrder(inq.id);
+                                  }
+                                }}
+                                className="text-xs px-3 py-1.5 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 font-bold rounded-lg cursor-pointer"
+                              >
+                                Cancel Order
+                              </button>
                             </div>
                           )}
                         </div>

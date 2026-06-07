@@ -71,7 +71,7 @@ export default function ProductCard({
         {/* Technical highlight sheet */}
         <div className="grid grid-cols-2 gap-2 p-2.5 bg-stone-100/60 rounded-xl font-mono text-[11px] text-stone-700">
           <div>
-            <span className="text-stone-400 block uppercase text-[8.5px]">Price Range</span>
+            <span className="text-stone-400 block uppercase text-[8.5px]">Price</span>
             <span className="font-extrabold text-[#D97706] text-[11px] truncate block">
               {loggedInCustomer?.role === 'cs' ? (product.csPricePerKgRange || product.pricePerKgRange) : product.pricePerKgRange}
             </span>
@@ -129,8 +129,23 @@ export default function ProductCard({
             </div>
           ) : (
             <button
-              onClick={(e) => onAddToInquiry(product, e)}
-              className="px-3 py-2 bg-emerald-900 hover:bg-emerald-950 text-white rounded-lg text-xs font-bold font-sans flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              onClick={(e) => {
+                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                import('canvas-confetti').then((module) => {
+                  const confetti = module.default;
+                  confetti({
+                    particleCount: 80,
+                    spread: 60,
+                    origin: { 
+                      x: (rect.left + rect.width / 2) / window.innerWidth,
+                      y: (rect.top + rect.height / 2) / window.innerHeight
+                    },
+                    colors: ['#059669', '#34d399', '#fcd34d']
+                  });
+                });
+                onAddToInquiry(product, e);
+              }}
+              className="px-3 py-2 bg-emerald-400 hover:bg-emerald-500 text-stone-950 rounded-lg text-xs font-bold font-sans flex items-center gap-1.5 transition-all cursor-pointer shadow-sm border border-emerald-500"
               id={`add-cart-btn-${product.id}`}
             >
               <Plus className="w-3.5 h-3.5" />

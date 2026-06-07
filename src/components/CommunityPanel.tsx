@@ -10,6 +10,8 @@ interface CommunityPanelProps {
   onAddContestEntry: (entry: ContestEntry) => void;
   onVoteContestEntry: (id: string, voterEmail: string) => void;
   customers: Customer[];
+  quizQuestions?: QuizQuestion[];
+  onUpdateCustomerRecord?: (updates: Partial<Customer>) => void;
   onOpenLogin: () => void;
 }
 
@@ -20,6 +22,8 @@ export default function CommunityPanel({
   onAddContestEntry,
   onVoteContestEntry,
   customers,
+  quizQuestions = QUIZ_QUESTIONS,
+  onUpdateCustomerRecord,
   onOpenLogin
 }: CommunityPanelProps) {
   // Navigation inside Playground
@@ -59,21 +63,44 @@ export default function CommunityPanel({
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Daily Questions based on IST
+  const { questions: dailyQuestions, dateStr: currentDateStr } = React.useMemo(() => {
+    if (!quizQuestions || quizQuestions.length === 0) return { questions: [], dateStr: '' };
+    
+    const now = new Date();
+    // Convert to IST (UTC + 5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
+    const istTime = new Date(utcTime + istOffset);
+    // Get unique day index
+    const dayIndex = Math.floor(istTime.getTime() / (24 * 60 * 60 * 1000));
+    const istDateStr = istTime.toISOString().split('T')[0];
+
+    // Pick 3 questions per day using dayIndex as seed
+    const qCount = Math.min(3, quizQuestions.length);
+    
+    // seeded shuffle
+    const pseudoRandom = (seed: number) => {
+      let x = Math.sin(seed++) * 10000;
+      return x - Math.floor(x);
+    };
+
+    const shuffled = [...quizQuestions].sort((a, b) => pseudoRandom(dayIndex + a.question.length) - 0.5);
+    return { questions: shuffled.slice(0, qCount), dateStr: istDateStr };
+  }, [quizQuestions]);
+
   const handleAcceptChallenge = (challId: string) => {
     if (tempAcceptedChallenges.includes(challId)) return;
     const updated = [...tempAcceptedChallenges, challId];
     setTempAcceptedChallenges(updated);
     localStorage.setItem('dryza_accepted_challenges', JSON.stringify(updated));
-    // Award 10 token points for committing to standard challenge
-    onUpdateCustomerPoints(10, 'Challenge Committed Bonus');
   };
 
   const handleCompleteChallenge = (challId: string) => {
     const challenge = WEEKLY_CHALLENGES.find(c => c.id === challId);
     if (!challenge) return;
 
-    if (confirm(`Click 'OK' to upload your Cooking Photo proof of "${challenge.title}" and earn ${challenge.pointsReward} XP!`)) {
-      onUpdateCustomerPoints(challenge.pointsReward, `Completed Challenge: ${challenge.title}`);
+    if (confirm(`Click 'OK' to upload your Cooking Photo proof of "${challenge.title}"!`)) {
       // Mark as completed
       if (loggedInCustomer) {
         const completed = loggedInCustomer.completedChallenges || [];
@@ -90,7 +117,7 @@ export default function CommunityPanel({
           }
         }
       }
-      alert('Congratulations! Proof accepted. Your points are loaded.');
+      alert('Congratulations! Proof accepted.');
     }
   };
 
@@ -156,9 +183,6 @@ export default function CommunityPanel({
 
         setGeneratedRecipe(customizedRecipe);
         setIsGeneratingRecipe(false);
-
-        // Give B2B customer XP points for using the AI generator
-        onUpdateCustomerPoints(30, 'Generated Gourmet AI Spice Recipe');
       }
     }, 1000);
   };
@@ -233,13 +257,12 @@ export default function CommunityPanel({
     };
 
     onAddContestEntry(contestEntry);
-    onUpdateCustomerPoints(120, `Entered Weekly Cooking Contest: ${newEntryDish}`);
 
     // Clean inputs
     setNewEntryDish('');
     setNewEntryImage('');
     setShowEntryForm(false);
-    alert('Hurrah! Your gourmet creation has been registered. Enjoy your +120 XP Points.');
+    alert('Hurrah! Your gourmet creation has been registered.');
   };
 
   const handleVoteClick = (entryId: string) => {
@@ -262,7 +285,7 @@ export default function CommunityPanel({
     if (selectedOption === null || quizSubmitted) return;
 
     setQuizSubmitted(true);
-    const question = QUIZ_QUESTIONS[currentQuizIndex];
+    const question = dailyQuestions[currentQuizIndex];
     if (selectedOption === question.correctAnswerIndex) {
       setScore(prev => prev + 1);
     }
@@ -272,14 +295,19 @@ export default function CommunityPanel({
     setSelectedOption(null);
     setQuizSubmitted(false);
 
-    if (currentQuizIndex < QUIZ_QUESTIONS.length - 1) {
+    if (currentQuizIndex < dailyQuestions.length - 1) {
       setCurrentQuizIndex(prev => prev + 1);
     } else {
       setQuizOver(true);
       // Award points
       const pointsWon = score * 50;
       if (pointsWon > 0) {
-        onUpdateCustomerPoints(pointsWon, `Passed Spice Science Quiz: Score ${score}/${QUIZ_QUESTIONS.length}`);
+        onUpdateCustomerPoints(pointsWon, `Passed Spice Science Quiz: Score ${score}/${dailyQuestions.length}`);
+      }
+      
+      // Update the user's completed date
+      if (loggedInCustomer && onUpdateCustomerRecord) {
+        onUpdateCustomerRecord({ quizCompletedAt: currentDateStr });
       }
     }
   };
@@ -397,7 +425,7 @@ export default function CommunityPanel({
             <button
               type="submit"
               disabled={isGeneratingRecipe || !userIngredients.trim()}
-              className="w-full bg-emerald-850 hover:bg-emerald-900 text-white font-mono font-black text-xs py-3 rounded-xl transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer disabled:bg-stone-300 disabled:cursor-not-allowed"
+              className="w-full bg-emerald-850 hover:bg-emerald-900 text-stone-950 font-mono font-black text-xs py-3 rounded-xl transition-all shadow flex items-center justify-center gap-1.5 cursor-pointer disabled:bg-stone-300 disabled:cursor-not-allowed"
               id="ai-generate-recipe-submit-btn"
             >
               {isGeneratingRecipe ? (
@@ -415,7 +443,7 @@ export default function CommunityPanel({
 
             <div className="p-3 bg-emerald-50 border border-emerald-150 rounded-2xl flex gap-2.5 text-[10px] text-emerald-900 leading-normal font-sans">
               <Sparkles className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
-              <span>Generating recipes with the Dryza AI Synthesis Model awards a persistent <strong>+30 XP Points</strong> to your company profile!</span>
+              <span>Experimenting with recipes via the Dryza AI Synthesis Model helps discover ultimate spice blending ratios.</span>
             </div>
           </form>
 
@@ -566,7 +594,6 @@ export default function CommunityPanel({
                 <span className="font-bold text-stone-905 text-sm flex items-center gap-1.5 font-sans uppercase tracking-tight">
                   <Award className="w-5 h-5 text-amber-700" /> Register Cooking Masterpiece
                 </span>
-                <span className="text-stone-400 font-mono text-[9.5px]">Awards: +120 Companion XP Points</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -635,7 +662,7 @@ export default function CommunityPanel({
               <div className="flex justify-end gap-2 text-[11px] pt-2 border-t">
                 <button
                   type="submit"
-                  className="bg-emerald-850 hover:bg-emerald-900 text-white font-mono font-bold px-4 py-2.5 rounded-xl shadow cursor-pointer transition-colors"
+                  className="bg-emerald-850 hover:bg-emerald-900 text-stone-950 font-mono font-bold px-4 py-2.5 rounded-xl shadow cursor-pointer transition-colors"
                 >
                   Publish Contest Entry
                 </button>
@@ -790,25 +817,38 @@ export default function CommunityPanel({
                   <h3 className="text-xl font-bold font-sans text-stone-900">Dryza Ingredient Science Quiz</h3>
                 </div>
                 <span className="font-mono text-xs font-bold text-stone-400">
-                  {!quizOver && `Question ${currentQuizIndex + 1} of ${QUIZ_QUESTIONS.length}`}
+                  {!quizOver && `Question ${currentQuizIndex + 1} of ${dailyQuestions.length}`}
                 </span>
               </div>
 
+              {/* Check if user already completed the quiz today */}
+              {loggedInCustomer?.quizCompletedAt === currentDateStr ? (
+                <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 text-center space-y-3">
+                  <Trophy className="w-10 h-10 text-emerald-600 mx-auto" />
+                  <h4 className="text-emerald-900 font-bold font-sans">You've completed today's quiz!</h4>
+                  <p className="text-emerald-800/80 text-xs font-mono">Come back tomorrow at 12:00 AM IST for new questions and to earn more XP.</p>
+                </div>
+              ) : dailyQuestions.length === 0 ? (
+                <div className="bg-stone-50 p-6 rounded-2xl border text-center text-stone-500 font-mono text-xs">
+                  No questions available right now. Please check back later!
+                </div>
+              ) : (
+              <>
               {/* QUIZ ACTIVE VIEW */}
               {!quizOver && (
                 <div className="space-y-6">
                   {/* Question block */}
                   <div className="bg-white p-4.5 rounded-2xl border">
                     <p className="text-sm font-semibold text-stone-950 font-display leading-snug">
-                      {QUIZ_QUESTIONS[currentQuizIndex].question}
+                      {dailyQuestions[currentQuizIndex].question}
                     </p>
                   </div>
 
                   {/* Options List */}
                   <div className="grid grid-cols-1 gap-3 font-sans text-xs">
-                    {QUIZ_QUESTIONS[currentQuizIndex].options.map((opt, oIdx) => {
+                    {dailyQuestions[currentQuizIndex].options.map((opt, oIdx) => {
                       const isSelected = selectedOption === oIdx;
-                      const isCorrect = QUIZ_QUESTIONS[currentQuizIndex].correctAnswerIndex === oIdx;
+                      const isCorrect = dailyQuestions[currentQuizIndex].correctAnswerIndex === oIdx;
                       
                       let optionBg = 'bg-white border-stone-250 hover:bg-stone-50';
                       if (isSelected) optionBg = 'bg-amber-50 border-amber-500 font-semibold';
@@ -835,7 +875,7 @@ export default function CommunityPanel({
                   {/* Verification Explanatory notes */}
                   {quizSubmitted && (
                     <div className="p-4 bg-emerald-50/50 border border-emerald-150 rounded-2xl text-[11.5px] text-[#0F766E] leading-relaxed font-sans">
-                      <strong>Explanatory Rationale:</strong> {QUIZ_QUESTIONS[currentQuizIndex].explanation}
+                      <strong>Explanatory Rationale:</strong> {dailyQuestions[currentQuizIndex].explanation}
                     </div>
                   )}
 
@@ -855,7 +895,7 @@ export default function CommunityPanel({
                   </div>
 
                   <div className="inline-block bg-stone-900 text-amber-500 font-mono font-bold text-lg px-5 py-2.5 rounded-xl border border-stone-800 tracking-wider">
-                    Your Score: {score} / {QUIZ_QUESTIONS.length}
+                    Your Score: {score} / {dailyQuestions.length}
                   </div>
 
                   {score > 0 ? (
@@ -865,28 +905,21 @@ export default function CommunityPanel({
                   ) : (
                     <p className="text-[11px] text-stone-400">Better luck next run! Study spice processing quality to score maximum. </p>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={handleRestartQuiz}
-                    className="bg-stone-900 hover:bg-stone-950 text-white font-mono font-bold text-xs py-2.5 px-4 rounded-xl shadow cursor-pointer inline-block"
-                  >
-                    Retake Spice Quiz
-                  </button>
                 </div>
               )}
-
+              </>
+              )}
             </div>
 
             {/* Bottom Row action controls */}
-            {!quizOver && (
+            {!quizOver && loggedInCustomer?.quizCompletedAt !== currentDateStr && dailyQuestions.length > 0 && (
               <div className="border-t pt-4 mt-6 flex justify-end gap-2 text-xs">
                 {!quizSubmitted ? (
                   <button
                     type="button"
                     disabled={selectedOption === null}
                     onClick={handleSubmitQuizAnswer}
-                    className="bg-stone-900 hover:bg-stone-950 text-white font-mono font-bold py-3 px-5 rounded-xl cursor-pointer disabled:bg-stone-300 disabled:cursor-not-allowed"
+                    className="bg-stone-900 hover:bg-stone-950 text-stone-950 font-mono font-bold py-3 px-5 rounded-xl cursor-pointer disabled:bg-stone-300 disabled:cursor-not-allowed"
                   >
                     Submit Answer
                   </button>
@@ -894,9 +927,9 @@ export default function CommunityPanel({
                   <button
                     type="button"
                     onClick={handleNextQuizQuestion}
-                    className="bg-emerald-850 hover:bg-emerald-900 text-white font-mono font-bold py-3 px-5 rounded-xl cursor-pointer shadow"
+                    className="bg-emerald-850 hover:bg-emerald-900 text-stone-950 font-mono font-bold py-3 px-5 rounded-xl cursor-pointer shadow"
                   >
-                    {currentQuizIndex === QUIZ_QUESTIONS.length - 1 ? 'Complete Assessment' : 'Next Question ➜'}
+                    {currentQuizIndex === dailyQuestions.length - 1 ? 'Complete Assessment' : 'Next Question ➜'}
                   </button>
                 )}
               </div>

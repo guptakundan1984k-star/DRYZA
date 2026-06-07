@@ -1,6 +1,8 @@
 {
-  "name": "Dryza Spices",
+  "name": "Dryza.com",
   "description": "Premium dehydrated vegetables, herbs, seasonings, and spice products for kitchens, B2B wholesale, and industrial food manufacturing.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "geolocation"
+  ],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

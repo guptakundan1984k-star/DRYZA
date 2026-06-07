@@ -324,7 +324,7 @@ export default function RewardsPanel({
 
               <div className="space-y-8 divide-y divide-stone-100">
                 {userInquiries.map((order, orderIdx) => {
-                  const steps = ['Ordered', 'Packaging', 'Shipped', 'Out for Delivery', 'Delivered'] as const;
+                  const steps = ['Ordered', 'Processed', 'Shipped', 'Out for Delivery', 'Delivered'] as const;
                   const currentIdx = steps.indexOf(order.status) !== -1 ? steps.indexOf(order.status) : 0;
 
                   return (
@@ -377,7 +377,7 @@ export default function RewardsPanel({
                             // Distinct icons/markers for pipeline status
                             let iconNode = <Clock className="w-4 h-4" />;
                             if (st === 'Ordered') iconNode = <ShoppingBag className="w-4 h-4" />;
-                            if (st === 'Packaging') iconNode = <Package className="w-4 h-4" />;
+                            if (st === 'Processed') iconNode = <Package className="w-4 h-4" />;
                             if (st === 'Shipped') iconNode = <Truck className="w-4 h-4" />;
                             if (st === 'Out for Delivery') iconNode = <MapPin className="w-4 h-4" />;
                             if (st === 'Delivered') iconNode = <CheckCircle className="w-4 h-4" />;
@@ -466,7 +466,7 @@ export default function RewardsPanel({
 
               <button
                 onClick={onOpenLogin}
-                className="bg-emerald-850 hover:bg-emerald-900 text-white font-mono font-bold text-xs py-3 px-5 rounded-xl text-center shadow transition-all cursor-pointer z-10"
+                className="bg-emerald-850 hover:bg-emerald-900 text-stone-950 font-mono font-bold text-xs py-3 px-5 rounded-xl text-center shadow transition-all cursor-pointer z-10"
               >
                 Sign In or Register Instantly
               </button>
@@ -600,7 +600,7 @@ export default function RewardsPanel({
               </div>
               <button
                 onClick={onOpenLogin}
-                className="bg-emerald-800 hover:bg-emerald-950 text-white font-mono text-[10px] uppercase font-bold py-2.5 px-4 rounded-xl shadow cursor-pointer"
+                className="bg-emerald-800 hover:bg-emerald-950 text-stone-950 font-mono text-[10px] uppercase font-bold py-2.5 px-4 rounded-xl shadow cursor-pointer"
               >
                 Launch Account Login
               </button>

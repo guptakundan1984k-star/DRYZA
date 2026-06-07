@@ -25,30 +25,24 @@ export default function Hero({ onSearch, onExploreProducts, onSelectCategory, tr
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            let start = 0;
-            setDisplayCount(0);
-            if (trustedCount === 0) {
-              return;
-            }
-            const duration = 1600; // ms
-            const stepTime = Math.max(Math.floor(duration / trustedCount), 20);
+            // Already animated or target is 0
+            if (trustedCount === 0 || badgeRef.current?.dataset.animated === 'true') return;
+            badgeRef.current.dataset.animated = 'true';
             
-            if (timer) clearInterval(timer);
-            timer = setInterval(() => {
-              start += 1;
-              if (start >= trustedCount) {
-                setDisplayCount(trustedCount);
-                if (timer) clearInterval(timer);
-              } else {
-                setDisplayCount(start);
+            const duration = 1600;
+            let startTimestamp: number | null = null;
+            
+            const step = (timestamp: number) => {
+              if (!startTimestamp) startTimestamp = timestamp;
+              const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+              setDisplayCount(Math.floor(progress * trustedCount));
+              
+              if (progress < 1) {
+                window.requestAnimationFrame(step);
               }
-            }, stepTime);
-          } else {
-            if (timer) {
-              clearInterval(timer);
-              timer = null;
-            }
-            setDisplayCount(0);
+            };
+            
+            window.requestAnimationFrame(step);
           }
         });
       },
@@ -131,7 +125,7 @@ export default function Hero({ onSearch, onExploreProducts, onSelectCategory, tr
                 />
                 <button
                   type="submit"
-                  className="bg-emerald-850 hover:bg-emerald-900 text-white font-medium px-6 py-3 rounded-xl text-sm transition-all shadow-md shrink-0 cursor-pointer"
+                  className="bg-emerald-850 hover:bg-emerald-900 text-stone-950 font-medium px-6 py-3 rounded-xl text-sm transition-all shadow-md shrink-0 cursor-pointer"
                   id="hero-search-submit"
                 >
                   Search

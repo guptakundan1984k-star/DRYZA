@@ -133,6 +133,9 @@ export default function ProductPouch({
     }
   };
 
+  // Determine if it's a custom user-added product with an uploaded image
+  const isCustomProduct = product.image && !['green-chilli-powder', 'onion-powder', 'lemon-powder', 'ginger-powder', 'garlic-powder', 'tomato-powder'].includes(product.id);
+
   return (
     <div className={`relative ${widthClass} ${heightClass} group select-none [perspective:1000px]`} id={`pouch-${product.id}`}>
       
@@ -167,66 +170,72 @@ export default function ProductPouch({
             </div>
           </div>
 
-          {/* Core White Sticker Decal */}
-          <div className="flex-1 bg-gradient-to-br from-[#FCFBF7] via-[#FFFDF9] to-[#F1EEE3] rounded-xl border-2 border-emerald-900/60 p-2.5 flex flex-col justify-between relative shadow-inner overflow-hidden mt-2.5">
-            
-            {/* Top Arched ribbon - Premium Dehydrated Spices */}
-            <div className="w-full bg-emerald-900 text-amber-100 text-[8px] font-sans font-bold uppercase tracking-wider text-center py-1 rounded-sm border-b border-amber-500/30">
-              ✦ PREMIUM DEHYDRATED SPICES ✦
+          {/* Core White Sticker Decal or Uploaded Image */}
+          {isCustomProduct ? (
+            <div className="flex-1 rounded-xl flex flex-col justify-between relative shadow-inner overflow-hidden mt-2.5">
+              <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
             </div>
+          ) : (
+            <div className="flex-1 bg-gradient-to-br from-[#FCFBF7] via-[#FFFDF9] to-[#F1EEE3] rounded-xl border-2 border-emerald-900/60 p-2.5 flex flex-col justify-between relative shadow-inner overflow-hidden mt-2.5">
+              
+              {/* Top Arched ribbon - Premium Dehydrated Spices */}
+              <div className="w-full bg-emerald-900 text-amber-100 text-[8px] font-sans font-bold uppercase tracking-wider text-center py-1 rounded-sm border-b border-amber-500/30">
+                ✦ PREMIUM DEHYDRATED SPICES ✦
+              </div>
 
-            {/* DRYZA SPICES Brand logo */}
-            <div className="flex flex-col items-center mt-1.5">
-              <h1 className="text-xl font-black text-emerald-950 tracking-tighter flex items-center gap-0.5">
-                <span className="text-emerald-700">D</span>RYZ<span className="text-emerald-800">A</span>
-                <span className="text-[7.5px] bg-[#d97706]/90 text-white rounded px-0.5 py-0.2 uppercase font-extrabold tracking-widest font-mono ml-1">
-                  Brand
+              {/* DRYZA SPICES Brand logo */}
+              <div className="flex flex-col items-center mt-1.5">
+                <h1 className="text-xl font-black text-emerald-950 tracking-tighter flex items-center gap-0.5">
+                  <span className="text-emerald-700">D</span>RYZ<span className="text-emerald-800">A</span>
+                  <span className="text-[7.5px] bg-[#d97706]/90 text-white rounded px-0.5 py-0.2 uppercase font-extrabold tracking-widest font-mono ml-1">
+                    Brand
+                  </span>
+                </h1>
+                <div className="h-px bg-amber-500 w-16 opacity-60"></div>
+                <span className="text-[7px] uppercase font-mono tracking-widest text-[#922b21] font-bold mt-0.5">Spices</span>
+              </div>
+
+              {/* Translation Text in Sanskrit/Hindi style */}
+              <div className="text-center mt-1">
+                <span className="text-[8px] font-semibold text-stone-850 bg-stone-150 px-2 py-0.5 rounded-full font-sans tracking-wide">
+                  शुद्ध । सूखा । स्वादिष्ट ।
                 </span>
-              </h1>
-              <div className="h-px bg-amber-500 w-16 opacity-60"></div>
-              <span className="text-[7px] uppercase font-mono tracking-widest text-[#922b21] font-bold mt-0.5">Spices</span>
-            </div>
+              </div>
 
-            {/* Translation Text in Sanskrit/Hindi style */}
-            <div className="text-center mt-1">
-              <span className="text-[8px] font-semibold text-stone-850 bg-stone-150 px-2 py-0.5 rounded-full font-sans tracking-wide">
-                शुद्ध । सूखा । स्वादिष्ट ।
-              </span>
-            </div>
+              {/* Middle Main Product Product Name Banner */}
+              <div className="text-center mt-1.5">
+                <span className="text-[10px] text-stone-500 font-mono tracking-widest uppercase block mb-1">
+                  {product.categoryLabel}
+                </span>
+                <h2 className="text-base font-extrabold text-stone-900 tracking-tight leading-4 uppercase pr-1 pl-1 scale-y-105 border-b border-stone-250 pb-1.5">
+                  {product.name.replace('Dehydrated ', '')}
+                </h2>
+              </div>
 
-            {/* Middle Main Product Product Name Banner */}
-            <div className="text-center mt-1.5">
-              <span className="text-[10px] text-stone-500 font-mono tracking-widest uppercase block mb-1">
-                {product.categoryLabel}
-              </span>
-              <h2 className="text-base font-extrabold text-stone-900 tracking-tight leading-4 uppercase pr-1 pl-1 scale-y-105 border-b border-stone-250 pb-1.5">
-                {product.name.replace('Dehydrated ', '')}
-              </h2>
-            </div>
+              {/* Core Illustration Graph */}
+              <div className="flex-1 flex flex-col justify-center items-center">
+                {renderSpiceIllustration(product.id)}
+              </div>
 
-            {/* Core Illustration Graph */}
-            <div className="flex-1 flex flex-col justify-center items-center">
-              {renderSpiceIllustration(product.id)}
-            </div>
+              {/* Footer Attributes: weight, 100% pure, no chemicals */}
+              <div className="border-t border-emerald-900/20 pt-1.5 mt-auto flex justify-between items-center text-[7.5px] text-stone-800 font-mono px-1">
+                <span>Net Wt. <strong className="text-emerald-950 text-[8.5px]">{product.netWt || "100g"}</strong></span>
+                <div className="w-1.5 h-1.5 bg-green-700 rounded-full flex items-center justify-center border border-green-900 shadow-sm" title="100% Vegetarian"></div>
+                <span>100% Dehydrated</span>
+              </div>
 
-            {/* Footer Attributes: weight, 100% pure, no chemicals */}
-            <div className="border-t border-emerald-900/20 pt-1.5 mt-auto flex justify-between items-center text-[7.5px] text-stone-800 font-mono px-1">
-              <span>Net Wt. <strong className="text-emerald-950 text-[8.5px]">{product.netWt || "100g"}</strong></span>
-              <div className="w-1.5 h-1.5 bg-green-700 rounded-full flex items-center justify-center border border-green-900 shadow-sm" title="100% Vegetarian"></div>
-              <span>100% Dehydrated</span>
-            </div>
+              <div className="text-[6.5px] text-center text-stone-500 font-sans tracking-normal mt-0.5">
+                No Added Preservatives • Made with Care
+              </div>
 
-            <div className="text-[6.5px] text-center text-stone-500 font-sans tracking-normal mt-0.5">
-              No Added Preservatives • Made with Care
             </div>
-
-          </div>
+          )}
 
           {/* Interactive Flip Trigger Banner in bottom footer */}
           <div className="w-full flex justify-center py-2">
             <button 
               onClick={handleFlip}
-              className="bg-stone-900/90 text-stone-100 hover:bg-black px-3.5 py-1.5 rounded-full text-[9.5px] font-mono tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
+              className="bg-stone-900/90 text-stone-950 hover:bg-black px-3.5 py-1.5 rounded-full text-[9.5px] font-mono tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
             >
               <RefreshCw className="w-3 h-3 text-amber-400 group-hover:rotate-180 transition-transform duration-500" />
               <span>Flip to Back Label</span>
@@ -249,11 +258,16 @@ export default function ProductPouch({
           <div className="w-full h-3 border-b-2 border-stone-400 bg-stone-300/45 px-6 rounded-t-sm flex items-center" />
 
           {/* Sticker decaling back side */}
-          <div className="flex-1 bg-[#FCFBF7] rounded-xl border-2 border-emerald-900/60 p-2.5 flex flex-col justify-between overflow-y-auto text-stone-900 mt-2.5 select-text">
-            
-            {/* Header banner */}
-            <div className="text-center pb-1 border-b border-stone-200">
-              <h3 className="text-xs font-bold text-emerald-950 uppercase">DRYZA SPICES BACK LABELS</h3>
+          {isCustomProduct ? (
+            <div className="flex-1 rounded-xl flex flex-col justify-between overflow-hidden mt-2.5">
+              <img src={product.image} alt={product.name} className="w-full h-full object-cover transform scale-x-[-1]" />
+            </div>
+          ) : (
+            <div className="flex-1 bg-[#FCFBF7] rounded-xl border-2 border-emerald-900/60 p-2.5 flex flex-col justify-between overflow-y-auto text-stone-900 mt-2.5 select-text">
+              
+              {/* Header banner */}
+              <div className="text-center pb-1 border-b border-stone-200">
+                <h3 className="text-xs font-bold text-emerald-950 uppercase">DRYZA SPICES BACK LABELS</h3>
               <p className="text-[7.5px] text-[#922b21] tracking-wider uppercase font-mono font-bold">{product.name.replace('Dehydrated ', '')}</p>
             </div>
 
@@ -388,18 +402,19 @@ export default function ProductPouch({
               <span className="flex items-center gap-1"><Mail className="w-2 h-2 shrink-0 text-emerald-800" /> Email: dryzaspices@gmail.com</span>
             </div>
 
-            {/* Footer motto banner slogan */}
+          {/* Footer motto banner slogan */}
             <div className="text-[5.5px] text-center text-emerald-900 bg-emerald-900/5 py-1 rounded-sm mt-2 font-semibold">
               MADE WITH CARE, PACKED WITH PURITY
             </div>
 
           </div>
+          )}
 
           {/* Flip to front trigger button */}
           <div className="w-full flex justify-center py-2">
             <button 
               onClick={handleFlip}
-              className="bg-stone-900/90 text-stone-100 hover:bg-black px-3.5 py-1.5 rounded-full text-[9.5px] font-mono tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
+              className="bg-stone-900/90 text-stone-950 hover:bg-black px-3.5 py-1.5 rounded-full text-[9.5px] font-mono tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
             >
               <RefreshCw className="w-3 h-3 text-amber-400" />
               <span>Flip to Front Label</span>

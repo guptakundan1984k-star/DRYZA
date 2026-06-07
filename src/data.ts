@@ -403,7 +403,7 @@ export const SEED_INQUIRIES: Inquiry[] = [
     customerType: 'manufacturer',
     estimatedQuantityKg: 2500,
     message: 'We are looking for Premium Tomato Powder with rich crimson color to formulate tomato instant cup soup base. Delivery to our Nagpur plant.',
-    status: 'Packaging',
+    status: 'Processed',
     submittedAt: '2026-06-04T09:30:00Z',
     adminNotes: 'Sent sample from batch #T-230. Awaiting laboratory trial confirmation.'
   }
