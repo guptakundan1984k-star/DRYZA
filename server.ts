@@ -99,6 +99,40 @@ Sort the results by score descending. Only return products that have a relevance
   }
 });
 
+// OTP Implementation
+const OTP_API_KEY = process.env.OTP_API_KEY || '0219f339-6249-11f1-8f15-0200cd936042';
+
+app.post('/api/otp/send', async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+  
+  try {
+     // Expected 2factor endpoints.
+     const url = `https://2factor.in/API/V1/${OTP_API_KEY}/SMS/${phone}/AUTOGEN/OTP1`;
+     const reqOtp = await fetch(url);
+     const json = await reqOtp.json();
+     res.json(json);
+  } catch (error: any) {
+     console.error('Send OTP Error:', error);
+     res.status(500).json({ error: error.message || 'Failed to send OTP via SMS integration.' });
+  }
+});
+
+app.post('/api/otp/verify', async (req, res) => {
+  const { session_id, otp } = req.body;
+  if (!session_id || !otp) return res.status(400).json({ error: 'Session ID and OTP required' });
+
+  try {
+     const url = `https://2factor.in/API/V1/${OTP_API_KEY}/SMS/VERIFY/${session_id}/${otp}`;
+     const verifyReq = await fetch(url);
+     const json = await verifyReq.json();
+     res.json(json);
+  } catch (error: any) {
+     console.error('Verify OTP Error:', error);
+     res.status(500).json({ error: error.message || 'Failed to verify OTP' });
+  }
+});
+
 // Vite middleware for development
 async function setupVite() {
   if (process.env.NODE_ENV !== 'production') {

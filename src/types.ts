@@ -17,6 +17,8 @@ export interface Product {
   csPricePerKgRange?: string; // For CS representative pricing
   isPopular?: boolean;
   image: string;
+  backImage?: string;
+  additionalImages?: string[];
   netWt?: string;
   mrp?: string;
   ingredientsText?: string;

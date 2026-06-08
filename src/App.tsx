@@ -13,6 +13,7 @@ import AdminPanel from './components/AdminPanel';
 import RewardsPanel from './components/RewardsPanel';
 import MyOrdersPage from './components/MyOrdersPage';
 import CommunityPanel from './components/CommunityPanel';
+import BlogSection from './components/BlogSection';
 import HomepageBanners from './components/HomepageBanners';
 import Footer from './components/Footer';
 import ProductPouch from './components/ProductPouch';
@@ -28,7 +29,10 @@ export default function App() {
   const [localSearchTerm, setLocalSearchTerm] = useState<string>('');
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, 50);
+    return () => clearTimeout(timer);
   }, [currentTab]);
 
   // AI Semantic Custom Search States
@@ -54,27 +58,46 @@ export default function App() {
   // Sourcing Client Accounts State
   const [customers, setCustomers] = useState<any[]>(() => {
     const saved = localStorage.getItem('dryza_customers');
-    if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: 'cs-sanjay',
-        fullName: 'Sanjay Nair',
-        email: 'snair@vikasfoods.co.in',
-        phone: '+91 98230 45432',
-        companyName: 'Vikas Foods Co.',
+    let parsed = saved ? JSON.parse(saved) : [];
+    
+    // Force insert 'anshgupta' if missing so they don't have to clear localStorage
+    if (!parsed.some((c: any) => c.phone === '6205284423')) {
+      parsed.push({
+        id: 'cs-anshgupta',
+        fullName: 'Ansh Gupta',
+        email: 'anshgupta4525@gmail.com',
+        phone: '6205284423',
+        companyName: 'Ansh Enterprises',
         country: 'India',
-        password: 'sanjay'
-      },
-      {
-        id: 'cs-kenji',
-        fullName: 'Kenji Suzuki',
-        email: 'suzuki@noodleworld.co.jp',
-        phone: '+81 3 5555 0142',
-        companyName: 'NoodleWorld Co.',
-        country: 'Japan',
-        password: 'kenji'
-      }
-    ];
+        password: 'OTP_AUTH',
+        role: 'corporate',
+        joinedAt: new Date().toISOString()
+      });
+    }
+
+    if (!saved || parsed.length === 1) {
+      parsed.push(
+        {
+          id: 'cs-sanjay',
+          fullName: 'Sanjay Nair',
+          email: 'snair@vikasfoods.co.in',
+          phone: '+91 98230 45432',
+          companyName: 'Vikas Foods Co.',
+          country: 'India',
+          password: 'sanjay'
+        },
+        {
+          id: 'cs-kenji',
+          fullName: 'Kenji Suzuki',
+          email: 'suzuki@noodleworld.co.jp',
+          phone: '+81 3 5555 0142',
+          companyName: 'NoodleWorld Co.',
+          country: 'Japan',
+          password: 'kenji'
+        }
+      );
+    }
+    return parsed;
   });
 
   const [loggedInCustomer, setLoggedInCustomer] = useState<any | null>(() => {
@@ -492,10 +515,7 @@ export default function App() {
     };
   }, []);
 
-  // Scroll to top automatically when navigating between sections
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [currentTab]);
+
 
   // Synchronize collections
   useEffect(() => {
@@ -735,7 +755,7 @@ export default function App() {
   };
 
   // Launching quote submission from RFQ form modal
-  const handleFormSubmitInquiry = (newInq: Omit<Inquiry, 'id' | 'submittedAt' | 'status'>): Inquiry => {
+  const handleFormSubmitInquiry = async (newInq: Omit<Inquiry, 'id' | 'submittedAt' | 'status'>): Promise<Inquiry> => {
     const freshInquiry: Inquiry = {
       ...newInq,
       id: `INQ-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -746,6 +766,29 @@ export default function App() {
     setDoc(doc(db, 'inquiries', freshInquiry.id), freshInquiry);
     setSelectedProducts([]); // Clean selection queue after positive launch
     setCartQuantities({}); // Reset cart quantities
+
+    // Try to send an email to the customer
+    try {
+      const { getDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('./lib/firebase');
+      const { sendOrderEmail } = await import('./lib/gmail');
+      
+      const gmailSetting = await getDoc(doc(db, 'settings', 'gmail'));
+      let token = null;
+      if (gmailSetting.exists()) {
+        token = gmailSetting.data().token;
+      }
+
+      if (token && freshInquiry.email) {
+          await sendOrderEmail(freshInquiry.email, freshInquiry, token);
+          console.log(`Order confirmation email sent to ${freshInquiry.email}`);
+      } else {
+          console.log('No Admin Gmail access token available in Firestore, or customer email is missing. Skipping email send.');
+      }
+    } catch (err) {
+      console.error('Failed to send order confirmation email via Gmail:', err);
+    }
+
     return freshInquiry;
   };
 
@@ -1307,6 +1350,16 @@ export default function App() {
               </div>
             )}
 
+            {currentTab === 'recipes' && (
+              <BlogSection
+                products={productsList}
+                onExploreProduct={(product) => {
+                  setSelectedProductForModal(product);
+                  setCurrentTab('catalogue');
+                }}
+              />
+            )}
+
             {currentTab === 'community' && (
               <CommunityPanel
                 loggedInCustomer={loggedInCustomer}
@@ -1352,6 +1405,7 @@ export default function App() {
                   onAddProduct={handleAddProductToInquiryInPlace}
                   onSubmitInquiry={handleFormSubmitInquiry}
                   onClose={() => setCurrentTab('catalogue')}
+                  onGoToOrders={() => setCurrentTab('orders')}
                   loggedInCustomer={loggedInCustomer}
                   customers={customers}
                   onRegister={(newCs) => {
@@ -1387,7 +1441,7 @@ export default function App() {
             )}
 
             {/* Other informational pages */}
-            {currentTab !== 'home' && currentTab !== 'catalogue' && currentTab !== 'community' && currentTab !== 'rewards' && currentTab !== 'cart' && currentTab !== 'orders' && (
+            {currentTab !== 'home' && currentTab !== 'catalogue' && currentTab !== 'recipes' && currentTab !== 'community' && currentTab !== 'rewards' && currentTab !== 'cart' && currentTab !== 'orders' && (
               <Pages
                 currentTab={currentTab}
                 openInquiryForm={() => setCurrentTab('cart')}
@@ -1408,6 +1462,7 @@ export default function App() {
         openBulkForm={() => setCurrentTab('cart')}
         logoUrl={logoUrl}
         fssaiLicNo={fssaiLicNo}
+        onSecretAdminTripleClick={triggerAdminWithPassword}
       />
 
       {/* Product Specification Inspection Modal */}

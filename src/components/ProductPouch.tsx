@@ -258,7 +258,11 @@ export default function ProductPouch({
           <div className="w-full h-3 border-b-2 border-stone-400 bg-stone-300/45 px-6 rounded-t-sm flex items-center" />
 
           {/* Sticker decaling back side */}
-          {isCustomProduct ? (
+          {product.backImage ? (
+            <div className="flex-1 rounded-xl flex flex-col justify-between overflow-hidden mt-2.5">
+              <img src={product.backImage} alt={product.name + ' Back'} className="w-full h-full object-cover" />
+            </div>
+          ) : isCustomProduct ? (
             <div className="flex-1 rounded-xl flex flex-col justify-between overflow-hidden mt-2.5">
               <img src={product.image} alt={product.name} className="w-full h-full object-cover transform scale-x-[-1]" />
             </div>

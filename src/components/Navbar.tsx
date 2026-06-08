@@ -33,6 +33,7 @@ export default function Navbar({
   const navItems = [
     { id: 'home', label: 'Home' },
     { id: 'catalogue', label: 'Products' },
+    { id: 'recipes', label: 'Recipes Blog' },
     { id: 'process', label: 'Technology & Quality' },
     { id: 'industries', label: 'B2B Solutions' },
     { id: 'community', label: 'Community Lab 🌶️' },
@@ -96,21 +97,6 @@ export default function Navbar({
 
           {/* Action Area */}
           <div className="hidden md:flex items-center space-x-3">
-            {/* Quick Admin Toggle */}
-            <button
-              onClick={() => setIsAdmin(!isAdmin)}
-              className={`p-2 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer ${
-                isAdmin
-                  ? 'bg-amber-100 text-amber-800 font-semibold border border-amber-200'
-                  : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
-              }`}
-              title="Toggle B2B Admin Area"
-              id="nav-admin-toggle"
-            >
-              <Database className="w-4.5 h-4.5" />
-              <span>{isAdmin ? 'Admin: ON' : 'Admin'}</span>
-            </button>
-
             {/* Client Account Sessions */}
             {loggedInCustomer ? (
               <div className="flex items-center gap-2 bg-emerald-50/60 border border-emerald-150 py-1.5 px-3 rounded-lg text-xs font-semibold text-emerald-900" id="navbar-buyer-session">
@@ -177,16 +163,6 @@ export default function Navbar({
             </button>
 
             <button
-              onClick={() => setIsAdmin(!isAdmin)}
-              className={`p-1.5 rounded-lg text-xs ${
-                isAdmin ? 'bg-amber-105 text-amber-800 border border-amber-200' : 'text-stone-500'
-              }`}
-              id="mobile-admin-toggle"
-            >
-              <Database className="w-4 h-4" />
-            </button>
-
-            <button
               onClick={() => setIsOpen(!isOpen)}
               className="inline-flex items-center justify-center p-2 rounded-lg text-stone-600 hover:text-stone-900 hover:bg-stone-100 focus:outline-none"
               id="mobile-menu-trigger"
@@ -240,17 +216,6 @@ export default function Navbar({
               </button>
             )}
 
-            <div className="flex justify-between items-center text-xs text-stone-500">
-              <span className="font-mono">Toggle Admin Portal Access:</span>
-              <button
-                onClick={() => setIsAdmin(!isAdmin)}
-                className={`px-3 py-1.5 rounded-md font-mono ${
-                  isAdmin ? 'bg-amber-100 text-amber-800 border-amber-200 border' : 'bg-stone-200 text-stone-700'
-                }`}
-              >
-                {isAdmin ? 'ADMIN ON' : 'ADMIN OFF'}
-              </button>
-            </div>
             <button
               onClick={() => {
                 setIsOpen(false);

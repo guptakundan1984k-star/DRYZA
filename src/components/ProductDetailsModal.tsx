@@ -119,6 +119,18 @@ Generated via Dryza Client Portal on June 2026.
                 </span>
                 <span className="text-[9.5px] text-stone-500 mt-0.5 block">Est. per Kg in Metric tons</span>
               </div>
+              
+              {/* Additional Photos Gallery */}
+              {product.additionalImages && product.additionalImages.length > 0 && (
+                <div className="w-full mt-2">
+                  <h4 className="text-[10px] font-mono font-bold text-stone-500 uppercase mb-2">Product Gallery</h4>
+                  <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
+                    {product.additionalImages.map((imgUrl, i) => (
+                      <img key={i} src={imgUrl} alt={`${product.name} Gallery ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-stone-200 snap-center shrink-0 shadow-sm" />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Spec definitions detail */}

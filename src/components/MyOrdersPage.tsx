@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Inquiry, Product, Customer } from '../types';
+import { jsPDF } from 'jspdf';
 import { 
   ClipboardCheck, 
   Clock, 
@@ -16,8 +17,166 @@ import {
   FileText, 
   ExternalLink,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  MapPin,
+  CheckCircle,
+  Languages
 } from 'lucide-react';
+
+// Corporate invoice / billing generator using jsPDF
+const generateInvoicePDF = (inq: Inquiry, allProducts: Product[]) => {
+  const doc = new jsPDF();
+  
+  // Design Theme Palette
+  // Deep corporate emerald: #064E3B (RGB: 6, 78, 59)
+  // Amber Accent: #D97706 (RGB: 217, 119, 6)
+  // Dark Stone: #1C1917 (RGB: 28, 25, 23)
+  // Muted light background details: #F5F5F4 (RGB: 245, 245, 244)
+  
+  // Custom Color Header representation
+  doc.setFillColor(6, 78, 59); // Emerald Background Panel
+  doc.rect(0, 0, 210, 36, 'F');
+  
+  // Dryza Corporate Identity Brand Block
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.text("DRYZA DEHYDRATED FOODS", 15, 18);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.text("Advanced Industrial Dehydration & Raw Sourcing Portfolios", 15, 25);
+  doc.text("FSSAI license No: 12724999000234 | Jamshedpur Office", 15, 30);
+  
+  // Invoice Heading Area on the right
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text("B2B TRADE INVOICE", 135, 18);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  const orderRef = `DRYZA-${inq.id.substring(0, 8).toUpperCase()}`;
+  doc.text(`Doc Reference: ${orderRef}`, 135, 24);
+  doc.text(`Booking Status: ${inq.status.toUpperCase()}`, 135, 29);
+  
+  // Buyers profiles
+  doc.setTextColor(28, 25, 23);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("REGISTERED BOURSE SOURCING PROFILE", 15, 52);
+  
+  doc.setDrawColor(214, 211, 209);
+  doc.setLineWidth(0.5);
+  doc.line(15, 54, 195, 54);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Corporate Entity: ${inq.companyName}`, 15, 62);
+  doc.text(`Sourcing Officer: ${inq.fullName}`, 15, 68);
+  doc.text(`Authorized Email: ${inq.email}`, 15, 74);
+  doc.text(`Contact Registry: ${inq.phone}`, 15, 80);
+  doc.text(`Destination Hub: ${inq.country}`, 15, 86);
+  doc.text(`B2B Classification: ${inq.customerType.toUpperCase().replace('_', ' ')}`, 15, 92);
+  
+  // Sourcing metadata summary
+  doc.text(`Submission Date: ${new Date(inq.submittedAt).toLocaleDateString()}`, 125, 62);
+  doc.text(`Tracking ID: ${inq.id}`, 125, 68);
+  doc.text(`Document Issued: ${new Date().toLocaleDateString()}`, 125, 74);
+  doc.text("Logistics Queue: Silo Transit Group", 125, 80);
+  
+  // Add product table
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("ITEMIZED MATERIALS TRADE REQUIREMENT", 15, 105);
+  doc.line(15, 107, 195, 107);
+  
+  // Table head backgrounds
+  doc.setFillColor(245, 245, 244);
+  doc.rect(15, 111, 180, 8, 'F');
+  
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.text("Material Description & Grade Specs", 18, 116.5);
+  doc.text("Target Volume", 102, 116.5);
+  doc.text("Indicated Price Scope", 132, 116.5);
+  doc.text("Bourse Distribution", 170, 116.5);
+  
+  doc.setFont("helvetica", "normal");
+  let currentRowY = 126;
+  const numItems = inq.productNames.length;
+  
+  inq.productNames.forEach((name, i) => {
+    const matched = allProducts.find(p => p.name === name);
+    const rangeVal = matched?.pricePerKgRange || "Rs. 185 - Rs. 245 / Kg";
+    const chunkWeight = Math.round(inq.estimatedQuantityKg / numItems);
+    
+    doc.text(`${i + 1}. ${name}`, 18, currentRowY);
+    doc.text(`${chunkWeight.toLocaleString()} Material Kg`, 102, currentRowY);
+    doc.text(rangeVal, 132, currentRowY);
+    doc.text(`${Math.round(100 / numItems)}% Load`, 170, currentRowY);
+    
+    // Draw row divider lines
+    doc.setDrawColor(245, 245, 244);
+    doc.line(15, currentRowY + 2.5, 195, currentRowY + 2.5);
+    currentRowY += 9.5;
+  });
+  
+  // Total prices box
+  currentRowY += 4;
+  doc.setFillColor(245, 245, 244);
+  doc.rect(122, currentRowY, 73, 38, 'F');
+  
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text("ESTIMATED DISPATCH TOTALS", 126, currentRowY + 6.5);
+  doc.setFont("helvetica", "normal");
+  
+  const discountVal = inq.discountAmount || 0;
+  const displayTotal = inq.totalPrice || (inq.estimatedQuantityKg * 210);
+  const displaySubtotal = displayTotal + discountVal;
+  
+  doc.text(`Subtotal Target: Rs. ${Math.round(displaySubtotal).toLocaleString()}`, 126, currentRowY + 15);
+  if (inq.couponCode) {
+    doc.setFont("helvetica", "bold");
+    doc.text(`Coupon [${inq.couponCode}]: -Rs. ${discountVal.toLocaleString()}`, 126, currentRowY + 21.5);
+    doc.setFont("helvetica", "normal");
+  } else {
+    doc.text(`Custom Coupon: None`, 126, currentRowY + 21.5);
+  }
+  
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10.5);
+  doc.setTextColor(217, 119, 6); // Warm gold total
+  doc.text(`Grand Tariff: Rs. ${Math.round(displayTotal).toLocaleString()}`, 126, currentRowY + 30.5);
+  doc.setTextColor(28, 25, 23);
+  
+  // Quality Standards list
+  doc.setFontSize(8.5);
+  doc.text("Laboratory Quality Control & Compliance Standards:", 15, currentRowY + 6.5);
+  doc.setFontSize(7.5);
+  doc.setTextColor(110, 110, 110);
+  doc.text("• Dryness index optimized: Dehydration yield captures 98% food volatile cells.", 15, currentRowY + 14);
+  doc.text("• Sterilization index: Steam treated & sterilized. Strict FSSAI compliance levels.", 15, currentRowY + 19.5);
+  doc.text("• Chemical limits: No synthetic additives, coloring ingredients, or pesticides.", 15, currentRowY + 25);
+  doc.text("• Logistics standard: Ships in moisture-proof, heavy-duty insulated vacuum packaging.", 15, currentRowY + 30.5);
+  
+  // Invoice Terms or Disclaimer
+  doc.setFontSize(8);
+  doc.setTextColor(28, 25, 23);
+  doc.setDrawColor(214, 211, 209);
+  doc.line(15, 195, 195, 195);
+  doc.text("This document is a formal quotation ledger and order specimen prepared automatically by our digital sourcing pipeline.", 15, 201.5);
+  doc.text("Pricing range values are strictly subject to raw agriculture spot prices, transport tolls and shipping fuel additions.", 15, 206);
+  
+  // Double-border lines matching ledger formats
+  doc.setDrawColor(6, 78, 59);
+  doc.setLineWidth(1);
+  doc.line(15, 211.5, 195, 211.5);
+  doc.line(15, 212.5, 195, 212.5);
+  
+  // Output and initiate download
+  doc.save(`Invoice_${orderRef}_DRYZA_FOODS.pdf`);
+};
 
 interface MyOrdersPageProps {
   inquiries: Inquiry[];
@@ -62,6 +221,21 @@ export default function MyOrdersPage({
     setExpandedOrderId(prev => (prev === id ? null : id));
   };
 
+  const translateToHindi = () => {
+    document.cookie = "googtrans=/en/hi; path=/";
+    document.cookie = "googtrans=/en/hi; domain="+window.location.hostname+"; path=/";
+    window.location.reload();
+  };
+
+  const translateToEnglish = () => {
+    document.cookie = "googtrans=/hi/en; path=/";
+    document.cookie = "googtrans=/hi/en; domain="+window.location.hostname+"; path=/";
+    // Also clear generic googtrans to reset
+    document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; domain="+window.location.hostname+"; path=/;";
+    window.location.reload();
+  };
+
   // Auth gate check
   if (!loggedInCustomer) {
     return (
@@ -97,9 +271,19 @@ export default function MyOrdersPage({
           <span className="font-mono text-xs font-bold uppercase tracking-widest text-emerald-805 bg-emerald-50 px-3 py-1 rounded-full">
             Realtime B2B Delivery Pipeline
           </span>
-          <h2 className="text-3xl font-extrabold text-stone-900 tracking-tight leading-none font-display">
-            My Corporate Orders & RFQs
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-3xl font-extrabold text-stone-900 tracking-tight leading-none font-display">
+              My Corporate Orders & RFQs
+            </h2>
+            <div className="flex gap-2">
+              <button onClick={translateToHindi} className="bg-orange-100 hover:bg-orange-200 text-orange-800 text-[10px] uppercase font-bold tracking-wider px-3 py-1.5 rounded flex items-center gap-1 cursor-pointer transition">
+                <Languages className="w-3 h-3" /> Translate to Hindi
+              </button>
+              <button onClick={translateToEnglish} className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-[10px] uppercase font-bold tracking-wider px-3 py-1.5 rounded flex items-center gap-1 cursor-pointer transition">
+                Original (EN)
+              </button>
+            </div>
+          </div>
           <p className="text-sm text-stone-605 max-w-2xl">
             Track live dispatch status of your trade consignments, view laboratory microbiological certifications, and preview invoice totals.
           </p>
@@ -220,6 +404,18 @@ export default function MyOrdersPage({
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        generateInvoicePDF(inq, allProducts);
+                      }}
+                      className="bg-emerald-800 text-white hover:bg-emerald-950 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer font-sans text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-102 shadow-xs shrink-0"
+                      title="Download formatted business invoice as a PDF"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Invoice PDF</span>
+                    </button>
+
                     <div className="text-right">
                       <span className="block text-[10px] text-stone-400 font-mono uppercase tracking-wider font-semibold">Consignment Quote</span>
                       <span className="text-sm font-extrabold text-emerald-850 font-mono">

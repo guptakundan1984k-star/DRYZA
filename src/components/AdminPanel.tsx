@@ -3,7 +3,7 @@ import { Inquiry, Product, ContestEntry, Customer, Banner, Coupon, WheelSettings
 import { CATEGORIES } from '../data';
 import { TrendingUp, BarChart3, Database, ShieldAlert, CheckSquare, RefreshCw,
   Plus, Edit, Trash2, Mail, Phone, MapPin, Search, Calendar, ChevronRight, Calculator, Globe, X,
-  Trophy, Heart, Award, Sparkles, Undo, ImageIcon, Settings, Percent, Gift
+  Trophy, Heart, Award, Sparkles, Undo, ImageIcon, Settings, Percent, Gift, Brain
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, deleteDoc, setDoc } from 'firebase/firestore';
@@ -93,6 +93,8 @@ export default function AdminPanel({
   const [tempStock, setTempStock] = useState<number>(0);
   const [tempPrice, setTempPrice] = useState<string>('');
   const [tempImage, setTempImage] = useState<string>('');
+  const [tempBackImage, setTempBackImage] = useState<string>('');
+  const [tempAdditionalImages, setTempAdditionalImages] = useState<string>('');
   const [tempName, setTempName] = useState<string>('');
   const [tempDescription, setTempDescription] = useState<string>('');
   const [tempShelfLife, setTempShelfLife] = useState<string>('');
@@ -119,6 +121,8 @@ export default function AdminPanel({
   const [newProdCsPriceRange, setNewProdCsPriceRange] = useState('₹4.50 - ₹7.00');
   const [newProdShelfLife, setNewProdShelfLife] = useState('12 Months');
   const [newProdImage, setNewProdImage] = useState('');
+  const [newProdBackImage, setNewProdBackImage] = useState('');
+  const [newProdAdditionalImages, setNewProdAdditionalImages] = useState('');
 
   // States for corporate logo crop & circle masking
   const [logoCropScale, setLogoCropScale] = useState<number>(1);
@@ -291,6 +295,8 @@ export default function AdminPanel({
     setTempStock(prod.stockTons);
     setTempPrice(prod.pricePerKgRange);
     setTempImage(prod.image || '');
+    setTempBackImage(prod.backImage || '');
+    setTempAdditionalImages(prod.additionalImages?.join(', ') || '');
     setTempName(prod.name);
     setTempDescription(prod.description || '');
     setTempShelfLife(prod.shelfLife || '12 Months');
@@ -306,7 +312,9 @@ export default function AdminPanel({
         csPricePerKgRange: tempCsPrice,
         shelfLife: tempShelfLife,
         description: tempDescription,
-        image: tempImage
+        image: tempImage,
+        backImage: tempBackImage || undefined,
+        additionalImages: tempAdditionalImages ? tempAdditionalImages.split(',').map(s => s.trim()).filter(Boolean) : undefined,
       });
     } else {
       onUpdateProductStock(id, tempStock);
@@ -361,7 +369,9 @@ export default function AdminPanel({
       pricePerKgRange: newProdPriceRange || '₹4.00 - ' + String.fromCharCode(8377) + '6.50',
       csPricePerKgRange: newProdCsPriceRange || newProdPriceRange || '₹4.50 - ' + String.fromCharCode(8377) + '7.00',
       isPopular: true,
-      image: newProdImage.trim() || 'https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&q=80&w=600'
+      image: newProdImage.trim() || 'https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&q=80&w=600',
+      backImage: newProdBackImage.trim() || undefined,
+      additionalImages: newProdAdditionalImages ? newProdAdditionalImages.split(',').map(s => s.trim()).filter(Boolean) : undefined,
     };
 
     onAddProduct(newProd);
@@ -1231,10 +1241,24 @@ export default function AdminPanel({
                     />
                     <input
                       type="text"
-                      placeholder="Or paste an image URL instead..."
+                      placeholder="Front image URL..."
                       className="w-full p-2 bg-white border border-stone-250 rounded-lg font-mono text-xs"
                       value={newProdImage}
                       onChange={(e) => setNewProdImage(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Back image URL (for flip)..."
+                      className="w-full p-2 bg-white border border-stone-250 rounded-lg font-mono text-xs"
+                      value={newProdBackImage}
+                      onChange={(e) => setNewProdBackImage(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Additional image URLs (comma separated)..."
+                      className="w-full p-2 bg-white border border-stone-250 rounded-lg font-mono text-xs"
+                      value={newProdAdditionalImages}
+                      onChange={(e) => setNewProdAdditionalImages(e.target.value)}
                     />
                     {newProdImage && (
                       <div className="flex items-center gap-1.5 mt-1.5">
@@ -1527,10 +1551,24 @@ export default function AdminPanel({
                                   </label>
                                   <input
                                     type="text"
-                                    placeholder="Or paste image URL link..."
+                                    placeholder="Front image URL link..."
                                     className="w-full text-[11px] p-1.5 bg-white border border-stone-250 rounded-lg font-mono outline-none focus:border-emerald-700"
                                     value={tempImage}
                                     onChange={(e) => setTempImage(e.target.value)}
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Back image URL link (flip)..."
+                                    className="w-full text-[11px] p-1.5 bg-white border border-stone-250 rounded-lg font-mono outline-none focus:border-emerald-700"
+                                    value={tempBackImage}
+                                    onChange={(e) => setTempBackImage(e.target.value)}
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Additional image URLs (comma separated)..."
+                                    className="w-full text-[11px] p-1.5 bg-white border border-stone-250 rounded-lg font-mono outline-none focus:border-emerald-700"
+                                    value={tempAdditionalImages}
+                                    onChange={(e) => setTempAdditionalImages(e.target.value)}
                                   />
                                 </div>
                               </div>
@@ -2566,6 +2604,49 @@ export default function AdminPanel({
               </form>
             </div>
 
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div className="bg-stone-50 rounded-2xl border border-stone-200 p-5 sm:p-6 space-y-4">
+              <h3 className="text-base font-bold text-stone-900 flex items-center gap-1.5 uppercase tracking-wider font-sans">
+                <Mail className="w-5 h-5 text-indigo-600" /> Auto-Email Notifications
+              </h3>
+              <p className="text-xs text-stone-500">
+                Connect the store's Gmail account using OAuth. Once connected, new order confirmations will be sent automatically to customers from this email context.
+              </p>
+              
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const { signInWithPopup } = await import('../lib/firebase');
+                    const { getDoc, doc, setDoc } = await import('firebase/firestore');
+                    const { db } = await import('../lib/firebase');
+                    
+                    const result = await signInWithPopup(true);
+                    if (result.credential?.accessToken) {
+                      await setDoc(doc(db, 'settings', 'gmail'), {
+                        token: result.credential.accessToken,
+                        email: result.user.email,
+                        updatedAt: new Date().toISOString()
+                      });
+                      alert(`Successfully connected to Gmail: ${result.user.email}`);
+                    }
+                  } catch (e: any) {
+                    alert('Error connecting Gmail: ' + e.message);
+                  }
+                }}
+                className="w-full bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 py-3 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 15.02 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Connect Store Gmail Integration
+              </button>
+            </div>
           </div>
 
           {/* Active Coupons List Table */}

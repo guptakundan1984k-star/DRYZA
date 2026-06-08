@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Globe, Shield, Award, Calendar } from 'lucide-react';
 import Logo from './Logo';
 
@@ -7,14 +7,34 @@ interface FooterProps {
   openBulkForm: () => void;
   logoUrl?: string;
   fssaiLicNo?: string;
+  onSecretAdminTripleClick?: () => void;
 }
 
-export default function Footer({ setCurrentTab, openBulkForm, logoUrl = '', fssaiLicNo = '12724999000234' }: FooterProps) {
+export default function Footer({ setCurrentTab, openBulkForm, logoUrl = '', fssaiLicNo = '12724999000234', onSecretAdminTripleClick }: FooterProps) {
   const currentYear = new Date().getFullYear();
+  const [fssaiClicks, setFssaiClicks] = useState(0);
 
   const handlePageNavigate = (tabId: string) => {
     setCurrentTab(tabId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleFssaiClick = () => {
+    const now = Date.now();
+    setFssaiClicks(prev => {
+      const lastClick = (window as any).__lastFssaiClick || 0;
+      (window as any).__lastFssaiClick = now;
+      if (now - lastClick > 1200) {
+        // More than 1.2s since last click, restart count
+        return 1;
+      }
+      const newCount = prev + 1;
+      if (newCount >= 3) {
+        if (onSecretAdminTripleClick) onSecretAdminTripleClick();
+        return 0; // Reset
+      }
+      return newCount;
+    });
   };
 
   return (
@@ -78,7 +98,11 @@ export default function Footer({ setCurrentTab, openBulkForm, logoUrl = '', fssa
             </div>
 
             {/* FSSAI Registration Badge */}
-            <div className="pt-2 flex items-center gap-3 bg-white/5 p-2.5 rounded-xl border border-white/10 w-fit">
+            <div 
+              className="pt-2 flex items-center gap-3 bg-white/5 p-2.5 rounded-xl border border-white/10 w-fit cursor-pointer select-none transition-colors hover:bg-white/10" 
+              onClick={handleFssaiClick}
+              title="FSSAI Registration"
+            >
               <div className="bg-white p-1 rounded-md flex items-center justify-center shrink-0 w-11 h-7">
                 <img 
                   src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/FSSAILogo.svg/1200px-FSSAILogo.svg.png" 
@@ -87,7 +111,7 @@ export default function Footer({ setCurrentTab, openBulkForm, logoUrl = '', fssa
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 pointer-events-none">
                 <span className="block text-[8px] font-mono font-bold tracking-widest text-[#22C55E] uppercase leading-none">fssai lic. no.</span>
                 <span className="block text-[11px] font-mono font-black text-white/90 leading-none">{fssaiLicNo}</span>
               </div>

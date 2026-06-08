@@ -25,24 +25,36 @@ export default function Hero({ onSearch, onExploreProducts, onSelectCategory, tr
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            // Already animated or target is 0
-            if (trustedCount === 0 || badgeRef.current?.dataset.animated === 'true') return;
-            badgeRef.current.dataset.animated = 'true';
+            // Target is 0
+            if (trustedCount === 0) return;
+            // Prevent multiple simultaneous animations
+            if (badgeRef.current?.dataset.animating === 'true') return;
+            if (badgeRef.current) badgeRef.current.dataset.animating = 'true';
             
-            const duration = 1600;
-            let startTimestamp: number | null = null;
+            let current = 0;
+            setDisplayCount(0);
             
-            const step = (timestamp: number) => {
-              if (!startTimestamp) startTimestamp = timestamp;
-              const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-              setDisplayCount(Math.floor(progress * trustedCount));
-              
-              if (progress < 1) {
-                window.requestAnimationFrame(step);
+            const timer = setInterval(() => {
+              current += 1;
+              if (current <= trustedCount) {
+                setDisplayCount(current);
+              } else {
+                clearInterval(timer);
+                if (badgeRef.current) badgeRef.current.dataset.animating = 'false';
               }
-            };
+            }, 35); // Smoothly increment step-by-step like a flip clock
             
-            window.requestAnimationFrame(step);
+            badgeRef.current.dataset.timerId = String(timer);
+          } else {
+             // Reset when scrolled out of view to animate again next time it scrolls in
+             setDisplayCount(0);
+             if (badgeRef.current) {
+               badgeRef.current.dataset.animating = 'false';
+               const existingTimer = badgeRef.current.dataset.timerId;
+               if (existingTimer) {
+                 clearInterval(Number(existingTimer));
+               }
+             }
           }
         });
       },
@@ -101,14 +113,31 @@ export default function Hero({ onSearch, onExploreProducts, onSelectCategory, tr
             </p>
 
             {/* Dynamic Animated Trusted Counter Badge */}
-            <div ref={badgeRef} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-amber-500/10 border border-amber-605 border-amber-600/10 text-stone-800 text-xs font-semibold" id="dynamic-trusted-badge">
+            <div ref={badgeRef} className="inline-flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#1C1917]/5 border border-stone-200 text-stone-800 text-xs font-semibold shadow-sm" id="dynamic-trusted-badge">
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="font-mono text-[11px] leading-none uppercase tracking-wider text-amber-900">
-                🤝 Trusted by <span className="text-stone-950 font-black text-sm">{displayCount}</span> Customers
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[11px] leading-none uppercase tracking-wider text-stone-600 font-bold">
+                  🤝 Trusted by
+                </span>
+                
+                {/* Physical Flip-Clock Digits representation */}
+                <div className="flex gap-[2.5px] items-center">
+                  {String(displayCount).padStart(2, '0').split('').map((digit, i) => (
+                    <div key={i} className="relative w-6 h-8 bg-stone-900 border border-stone-950 text-[#F59E0B] font-mono font-extrabold text-[17px] flex items-center justify-center rounded-md shadow-md overflow-hidden">
+                      {/* Split dividing line representing flip clock leaf */}
+                      <div className="absolute inset-x-0 top-0 h-[48%] bg-white/5 border-b border-black/40"></div>
+                      <span className="relative z-10 leading-none select-none tracking-normal">{digit}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <span className="font-mono text-[11px] leading-none uppercase tracking-wider text-stone-600 font-bold">
+                  Corporate Clients
+                </span>
+              </div>
             </div>
 
             {/* Smart Integrated Search */}

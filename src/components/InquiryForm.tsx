@@ -7,7 +7,7 @@ interface InquiryFormProps {
   selectedProducts: Product[];
   onRemoveProduct: (productId: string) => void;
   onAddProduct: (product: Product) => void;
-  onSubmitInquiry: (inquiry: Omit<Inquiry, 'id' | 'submittedAt' | 'status'>) => Inquiry;
+  onSubmitInquiry: (inquiry: Omit<Inquiry, 'id' | 'submittedAt' | 'status'>) => Promise<Inquiry> | Inquiry;
   onClose: () => void;
   loggedInCustomer: any | null;
   customers: any[];
@@ -22,6 +22,7 @@ interface InquiryFormProps {
   onIncrementQuantity?: (productId: string) => void;
   onDecrementQuantity?: (productId: string) => void;
   isFullPage?: boolean;
+  onGoToOrders?: () => void;
 }
 
 export default function InquiryForm({
@@ -43,7 +44,8 @@ export default function InquiryForm({
   cartQuantities,
   onIncrementQuantity,
   onDecrementQuantity,
-  isFullPage = false
+  isFullPage = false,
+  onGoToOrders = () => {},
 }: InquiryFormProps) {
   // Inline Auth states if client is not logged in
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -129,6 +131,11 @@ export default function InquiryForm({
   const [spinResult, setSpinResult] = useState<string | null>(null);
   const [hasWheelSpun, setHasWheelSpun] = useState(false);
   
+  // Submission Animation & Error State
+  const [countryError, setCountryError] = useState(false);
+  const countryInputRef = useRef<HTMLInputElement>(null);
+  const [orderSuccessAnimation, setOrderSuccessAnimation] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filter out products already selected
@@ -195,8 +202,10 @@ export default function InquiryForm({
 
   const computedSubtotal = useMemo(() => estimatedQuantityKg * computedBasePrice, [estimatedQuantityKg, computedBasePrice]);
 
-  const executeSubmit = (e: React.FormEvent) => {
+  const executeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCountryError(false);
+    
     if (selectedProducts.length === 0) {
       alert("Please select at least one dehydrated product for your cart.");
       return;
@@ -205,6 +214,16 @@ export default function InquiryForm({
       alert("Please fill out all mandatory business information fields.");
       return;
     }
+    if (!country) {
+      setCountryError(true);
+      if (countryInputRef.current) {
+        countryInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        countryInputRef.current.focus();
+      }
+      return;
+    }
+
+    setOrderSuccessAnimation(true);
 
     let computedDiscount = 0;
     if (appliedCoupon) {
@@ -216,7 +235,7 @@ export default function InquiryForm({
     }
     const finalCalculatedPrice = Math.max(0, computedSubtotal - computedDiscount);
 
-    const savedInq = onSubmitInquiry({
+    const savedInq = await onSubmitInquiry({
       productIds: selectedProducts.map((p) => p.id),
       productNames: selectedProducts.map((p) => p.name),
       companyName,
@@ -235,7 +254,12 @@ export default function InquiryForm({
     });
 
     setCreatedInquiry(savedInq);
-    setIsSubmitted(true);
+    
+    // Hold animation for 2 seconds before showing the summary view
+    setTimeout(() => {
+      setOrderSuccessAnimation(false);
+      setIsSubmitted(true);
+    }, 2000);
   };
 
   const formContent = (
@@ -378,7 +402,16 @@ export default function InquiryForm({
                         </div>
                       </div>
 
-                      <div className="pt-2 text-center md:text-left">
+                      <div className="pt-2 text-center md:text-left flex flex-col gap-2">
+                        <button
+                          onClick={() => {
+                            setIsSubmitted(false);
+                            onGoToOrders();
+                          }}
+                          className="w-full bg-amber-800 hover:bg-amber-900 text-stone-100 py-2.5 rounded-xl text-xs font-bold shadow transition-colors cursor-pointer"
+                        >
+                          Go to My Orders
+                        </button>
                         <button
                           onClick={() => {
                             setIsSubmitted(false);
@@ -535,7 +568,16 @@ export default function InquiryForm({
                       </div>
                     </div>
 
-                    <div className="pt-4">
+                    <div className="pt-4 flex flex-col md:flex-row justify-center gap-3">
+                      <button
+                        onClick={() => {
+                          setIsSubmitted(false);
+                          onGoToOrders();
+                        }}
+                        className="bg-amber-800 hover:bg-amber-900 text-stone-100 px-8 py-3 rounded-xl text-sm font-bold shadow-md cursor-pointer transition-colors"
+                      >
+                        Go to My Orders
+                      </button>
                       <button
                         onClick={() => {
                           setIsSubmitted(false);
@@ -600,8 +642,8 @@ export default function InquiryForm({
                   type="button"
                   onClick={async () => {
                     try {
-                      const { auth, googleProvider, signInWithPopup } = await import('../lib/firebase');
-                      const result = await signInWithPopup(auth, googleProvider);
+                      const { signInWithPopup } = await import('../lib/firebase');
+                      const result = await signInWithPopup();
                       const user = result.user;
                       
                       let matched = customers.find(c => c.email.toLowerCase() === user.email?.toLowerCase());
@@ -859,7 +901,7 @@ export default function InquiryForm({
           </div>
         ) : (
           /* Submission Form */
-          <form onSubmit={executeSubmit} className="p-6 md:p-8 max-h-[75vh] overflow-y-auto space-y-6" id="bulk-cart-form">
+          <form onSubmit={executeSubmit} noValidate className={`p-6 md:p-8 space-y-6 ${isFullPage ? '' : 'max-h-[75vh] overflow-y-auto'}`} id="bulk-cart-form">
             
             {/* Products Selector Grid and Queue */}
             <div className="space-y-3">
@@ -979,10 +1021,10 @@ export default function InquiryForm({
                   <input
                     type="text"
                     required
-                    disabled
                     placeholder="e.g. Apex Food Processing Ltd."
-                    className="w-full px-3 py-2.5 text-sm bg-stone-100 font-medium text-stone-700 border border-stone-200 rounded-xl cursor-not-allowed"
+                    className="w-full px-3 py-2.5 text-sm bg-white font-medium text-stone-700 border border-stone-200 rounded-xl focus:border-emerald-700 focus:outline-none"
                     value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
                   />
                 </div>
 
@@ -1010,9 +1052,9 @@ export default function InquiryForm({
                   <input
                     type="text"
                     required
-                    disabled
-                    className="w-full px-3 py-2.5 text-sm bg-stone-100 font-medium text-stone-700 border border-stone-200 rounded-xl cursor-not-allowed"
+                    className="w-full px-3 py-2.5 text-sm bg-white font-medium text-stone-700 border border-stone-200 rounded-xl focus:border-emerald-700 focus:outline-none"
                     value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                   />
                 </div>
 
@@ -1022,9 +1064,9 @@ export default function InquiryForm({
                   <input
                     type="email"
                     required
-                    disabled
-                    className="w-full px-3 py-2.5 text-sm bg-stone-100 font-medium text-stone-700 border border-stone-200 rounded-xl cursor-not-allowed"
+                    className="w-full px-3 py-2.5 text-sm bg-white font-medium text-stone-700 border border-stone-200 rounded-xl focus:border-emerald-700 focus:outline-none"
                     value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
 
@@ -1034,9 +1076,9 @@ export default function InquiryForm({
                   <input
                     type="tel"
                     required
-                    disabled
-                    className="w-full px-3 py-2.5 text-sm bg-stone-100 font-medium text-stone-700 border border-stone-200 rounded-xl cursor-not-allowed"
+                    className="w-full px-3 py-2.5 text-sm bg-white font-medium text-stone-700 border border-stone-200 rounded-xl focus:border-emerald-700 focus:outline-none"
                     value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                   />
                 </div>
 
@@ -1068,11 +1110,16 @@ export default function InquiryForm({
                   <input
                     type="text"
                     required
+                    ref={countryInputRef}
                     placeholder="Enter manual address or use Locate Live"
-                    className="w-full px-3 py-2.5 text-sm bg-white font-medium text-stone-700 border border-stone-200 rounded-xl focus:border-emerald-700 focus:outline-none"
+                    className={`w-full px-3 py-2.5 text-sm bg-white font-medium text-stone-700 border ${countryError ? 'border-red-500 bg-red-50 focus:border-red-600 focus:ring-1 focus:ring-red-500' : 'border-stone-200 focus:border-emerald-700 focus:outline-none'} rounded-xl transition-colors`}
                     value={country}
-                    onChange={(e) => setCountry(e.target.value)}
+                    onChange={(e) => {
+                      setCountry(e.target.value);
+                      if (countryError) setCountryError(false);
+                    }}
                   />
+                  {countryError && <span className="text-[10px] text-red-500 font-bold block pt-1 animate-pulse">Required field</span>}
                 </div>
 
               </div>
@@ -1309,25 +1356,36 @@ export default function InquiryForm({
             </div>
 
             {/* Primary Submit Button */}
-            <div className="pt-2 flex justify-end gap-3.5">
-              <button
-                type="button"
-                onClick={onClose}
-                className="bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold px-6 py-3 rounded-xl text-xs uppercase"
-              >
-                Cancel
-              </button>
+            <div className="pt-2 flex justify-end gap-3.5 relative h-12">
+              {!orderSuccessAnimation && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold px-6 py-3 rounded-xl text-xs uppercase"
+                >
+                  Cancel
+                </button>
+              )}
               <button
                 type="submit"
-                disabled={selectedProducts.length === 0}
-                className={`px-8 py-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider shadow-md transition-all cursor-pointer ${
-                  selectedProducts.length === 0
-                    ? 'bg-stone-300 text-stone-9500 cursor-not-allowed'
-                    : 'bg-emerald-900 text-stone-950 hover:bg-emerald-950 font-extrabold'
+                disabled={selectedProducts.length === 0 || orderSuccessAnimation}
+                className={`py-3 rounded-xl text-xs font-mono font-bold uppercase tracking-wider shadow-md transition-all duration-500 flex items-center justify-center gap-2 ${
+                  orderSuccessAnimation
+                    ? 'absolute right-0 bottom-0 bg-green-500 text-white rounded-full px-6 -translate-y-2 scale-105 shadow-xl'
+                    : selectedProducts.length === 0
+                    ? 'px-8 bg-stone-300 text-stone-950 cursor-not-allowed relative'
+                    : 'px-8 bg-emerald-900 text-stone-950 hover:bg-emerald-950 font-extrabold relative cursor-pointer'
                 }`}
                 id="submit-order-button"
               >
-                Place Cart Order
+                {orderSuccessAnimation ? (
+                  <>
+                    <CheckCircle2 className="w-5 h-5 text-white" />
+                    Order Placed Successfully
+                  </>
+                ) : (
+                  'Place Cart Order'
+                )}
               </button>
             </div>
 
